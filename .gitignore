@@ -1,0 +1,21 @@
+# entorno
+.env
+.env.*
+
+# python
+__pycache__/
+*.pyc
+
+# virtual env
+venv/
+.env/
+
+# logs
+*.log
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
