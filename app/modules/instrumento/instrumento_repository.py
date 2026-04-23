@@ -2,37 +2,40 @@
 from .instrumento_schema import InstrumentoI
 from app.core.config import settings
 import requests
+from datetime import datetime, timedelta, timezone
+
 
 METRIS_BASE_URI = settings.METRIS_BASE_URI
 METRIS_TOKEN = settings.METRIS_TOKEN
-print("base uri: ", METRIS_BASE_URI, "token: ", METRIS_TOKEN)
 headers = {
     "Authorization": f"Bearer {METRIS_TOKEN}"
 }
 
 url = f"{METRIS_BASE_URI}/api/public/Historian/trendvalues"
 
+now = datetime.now(timezone.utc)
+one_hour_ago = now - timedelta(hours=1)
+five_minutes_ago = now - timedelta(minutes=5)
+
 params = {
-    "ID": "86743",
-    "TagID": "86743",
-    "Start": "2026-01-19T00:00:00Z",
-    "End": "2026-01-20T00:00:00Z",
+    "ID": "9367",
+    "TagID": "9067",
+    #"Start": one_hour_ago.strftime("%Y-%m-%dT%H:%M:%SZ"),#Hora actual menos una hora en formato ISO 8601
+    "Start": five_minutes_ago.strftime("%Y-%m-%dT%H:%M:%SZ"),#Hora actual menos una hora en formato ISO 8601
+    "End": now.strftime("%Y-%m-%dT%H:%M:%SZ"),#Hora actual en formato ISO 8601
     "InterpolationMethod": 0,
-    "AggregateFunction": 3,
+    "AggregateFunction": 1,#Cantidad de datos en el mismo json
     "InterpolationResolutionType": 1,
     "interpolationresolution": 600000000
 }
 
-response = requests.get(url, headers=headers, params=params)
-print(response)
-#print("STATUS:", response.status_code)
-#print("RESPONSE:", response.text)
+
 
 def obtener_desde_api():
-    #response = requests.get(url, headers=headers, params=params)
-    #print("STATUS:", response.status_code)
-    #print("RESPONSE:", response.text)
-    #return response.json()
-    instrumento1 = InstrumentoI(id=1, nombre="Guitarra", tipo="Cuerda", valor=150.0)
-    instrumento2 = InstrumentoI(id=2, nombre="Piano", tipo="Teclado", valor=1000.0)
-    return {"Instrumento1":instrumento1,"instrumento2": instrumento2}
+    response = requests.get(url, headers=headers, params=params, verify=False)
+    print(response)
+    data = response.json()
+    return data
+    #instrumento1 = InstrumentoI(id=1, nombre="Guitarra", tipo="Cuerda", valor=150.0)
+    #instrumento2 = InstrumentoI(id=2, nombre="Piano", tipo="Teclado", valor=1000.0)
+    #return {"Instrumento1":instrumento1,"instrumento2": instrumento2}
