@@ -5,11 +5,19 @@ import urllib3
 import pandas as pd
 from pathlib import Path
 import numpy as np
+from app.infrastructure.metrisapi.historian import HistorianClient
 #######CRITICO!!!!!!!!!!!!!!!##################################
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-TIEMPO_CONGELADO = 0
+hc = HistorianClient(base_uri=settings.METRIS_BASE_URI,token=lambda: settings.METRIS_TOKEN)
 
+def quality_code_metris_api():
+    
+    data = hc.get_tag_values(ids=6248)
+    print(data)
+    return data
+
+TIEMPO_CONGELADO = 0
 def tiempo_actual():
     now = datetime.now(timezone.utc)
     TIEMPO_CONGELADO = now

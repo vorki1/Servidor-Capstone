@@ -2,26 +2,18 @@ from app.core.config import settings
 import requests
 from datetime import datetime, timedelta, timezone
 import urllib3
+from app.infrastructure.metrisapi.historian import HistorianClient
 #######CRITICO!!!!!!!!!!!!!!!##################################
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-ID_A_REVISAR = [6247,6248]
 TIEMPO_CONGELADO = 0
 
+hc = HistorianClient(base_uri=settings.METRIS_BASE_URI,token=lambda: settings.METRIS_TOKEN)
+
 def quality_code_metris_api():
-    METRIS_BASE_URI = settings.METRIS_BASE_URI
-    METRIS_TOKEN = settings.METRIS_TOKEN
-    headers = {
-        "Authorization": f"Bearer {METRIS_TOKEN}"
-    }
-    url = f"{METRIS_BASE_URI}/api/public/Historian/get_tag_values(6192)"
-    response = requests.get(url, headers=headers, verify=False)
-    print(response.status_code, response.text)  # Agrega esta línea para imprimir el código de estado y el texto de la respuesta
-    if response.status_code == 404:
-        print("Endpoint no encontrado (404)")
-        return None
-    data = response.json()
-    print("Data obtenida de la API de Metris para Quality Code:", data)
+    
+    data = hc.get_tag_values(ids=6248)
+    print(data)
     return data
 
 def historico_instrumento_metris_api():
@@ -67,33 +59,6 @@ def historico_instrumento_metris_api():
     print(data)
     return data
 
-def tiempo_actual():
-    now = datetime.now(timezone.utc)
-    TIEMPO_CONGELADO = now
-    return TIEMPO_CONGELADO
-
-def historico_individual_por_instrumento(instrumento_id, primer_muestreo):
-    METRIS_BASE_URI = settings.METRIS_BASE_URI
-    METRIS_TOKEN = settings.METRIS_TOKEN
-    headers = {
-        "Authorization": f"Bearer {METRIS_TOKEN}"
-    }
-
-    url = f"{METRIS_BASE_URI}/api/public/Historian/trendvalues"
-
-    one_hour_ago = primer_muestreo - timedelta(hours=1)
-    five_minutes_ago = primer_muestreo - timedelta(minutes=5)
-
-    params = {
-        "ID": instrumento_id,
-        "TagID": instrumento_id,
-        "Start": five_minutes_ago.strftime("%Y-%m-%dT%H:%M:%SZ"),#Hora actual menos una hora en formato ISO 8601
-        "End": primer_muestreo.strftime("%Y-%m-%dT%H:%M:%SZ"),#Hora actual en formato ISO 8601
-        "InterpolationMethod": 0,
-        "AggregateFunction": 1,#Cantidad de datos en el mismo json
-        "InterpolationResolutionType": 1, #Cuantos puntos yo reconstruyo la serie de tiempo original
-        "interpolationresolution": 600000000 #Muestreo de interpolación, cantidad de muestra por minuto
-    }
-    response = requests.get(url, headers=headers, params=params, verify=False)
-    data = response.json()
-    return data
+def app_metris(): 
+    #MetrisAPIClient.get_tag_values(6192)
+    pass

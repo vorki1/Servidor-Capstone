@@ -1,10 +1,17 @@
-from .data_loader import datos_historicos_por_instrumento, tiempo_actual, datos_matriz_a
+from .data_loader import datos_historicos_por_instrumento, tiempo_actual, datos_matriz_a, quality_code_metris_api
 import pandas as pd
 import math
+
+def quality_code(id):
+    data = quality_code_metris_api()
+    #Limpiar data para solo recibir el quality code
+    quality_code_number = 1
+    return quality_code_number
 
 def filtrar_matriz_a():
     df_matriz_a = datos_matriz_a() #Entrega un objeto de python =records
     print("Filtramos la matriz A -----> Generando la matriz B")
+    #Hacemos el llamado a la funcion de qualitycode y filtramos por los que tengan mejor calidad
     return df_matriz_a
 
 def completar_matriz_b_con_datos_historicos(identificador, matriz_datos, primer_muestreo): #Aux rellenado de Matriz B con datos historicos

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from .instrumento_service import historico_instrumento, procesamiento_matriz_b, quality_code, matriz_b
+from .instrumento_service import historico_instrumento, quality_code, matriz_b
 
 router = APIRouter(
     prefix="/instrumento",
@@ -10,12 +10,6 @@ router = APIRouter(
 def obtener_instrumentos():
     instrumentos = historico_instrumento()
     return instrumentos
-
-@router.get("/procesamiento-matriz-b")
-def procesamiento_df_matriz_b():
-    procesamiento_matriz_b()
-    csv_data = "Holaa"
-    return {"mensaje": "CSV obtenido correctamente", "csv_data": csv_data}
 
 @router.get("/quality-code")
 def obtener_quality_code():
