@@ -6,6 +6,7 @@ import pandas as pd
 from pathlib import Path
 import numpy as np
 from app.infrastructure.metrisapi.historian import HistorianClient
+import httpx
 #######CRITICO!!!!!!!!!!!!!!!##################################
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -23,7 +24,7 @@ def tiempo_actual():
     TIEMPO_CONGELADO = now
     return TIEMPO_CONGELADO
 
-def datos_historicos_por_instrumento(instrumento_id, primer_muestreo):# datos historicos
+async def datos_historicos_por_instrumento(instrumento_id, primer_muestreo):# datos historicos
     METRIS_BASE_URI = settings.METRIS_BASE_URI
     METRIS_TOKEN = settings.METRIS_TOKEN
     headers = {
@@ -45,7 +46,8 @@ def datos_historicos_por_instrumento(instrumento_id, primer_muestreo):# datos hi
         "InterpolationResolutionType": 1, #Cuantos puntos yo reconstruyo la serie de tiempo original
         "interpolationresolution": 600000000 #Muestreo de interpolación, cantidad de muestra por minuto
     }
-    response = requests.get(url, headers=headers, params=params, verify=False)
+    async with httpx.AsyncClient(verify=False) as client:
+        response = await client.get(url, headers=headers, params=params)
     data = response.json()
     return data
 

@@ -24,10 +24,6 @@ def leer_csv_info_general_instrumentos():
     return df_matriz_a
 
 def matriz_a():
-    #print("Leyendo CSV de instrumentos...")
-    #df_matriz_a = leer_csv_info_general_instrumentos() 
-    #Esta funcion lee los csv
-
     print("Leyendo matriz de excel de instrumentos mapeados...")
     df_mapeo_instrumentos = leer_excel_instrumentos_mapeados() #Aca es un dataframe
     cols_str = df_mapeo_instrumentos.select_dtypes(include=["object", "string"]).columns

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from .instrumento_service import historico_instrumento, quality_code, matriz_b
+from .instrumento_service import historico_instrumento, quality_code, matriz_b, areas_unicas,subareas_de_area,instrumentos_por_subarea, datos_historicos_por_id
 
 router = APIRouter(
     prefix="/instrumento",
@@ -17,5 +17,21 @@ def obtener_quality_code():
     return quality_code_json
 
 @router.get("/matriz-b")
-def obtener_matriz_b():
-    return matriz_b()
+async def obtener_matriz_b():
+    return await matriz_b()
+
+@router.get("/areas")#Endpoint de todas las areas
+async def todas_las_areas():
+    return await areas_unicas()
+
+@router.get("/subareas")#Endpoint de todas las subareas de un area
+async def todas_las_subareas_de_area(area:int):
+    return await subareas_de_area(area)
+
+@router.get("/instrumentos")#Endpoint de todos los instrumentos de una subarea
+async def obtener_instrumentos_de_subarea(subarea:str):
+    return await instrumentos_por_subarea(subarea)
+
+@router.get("/histogram")#Endpoint del historial de tiempo de un instrumento
+async def datos_historicos_por_instrumento(id:int,minutos:int):
+    return await datos_historicos_por_id(id,minutos)
