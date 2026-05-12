@@ -1,11 +1,8 @@
 import pandas as pd
-import math
-from io import StringIO
-from fastapi.responses import StreamingResponse
-from .instrumento_repository_metris import historico_instrumento_metris_api, quality_code_metris_api,datos_historicos_por_instrumento
-from .pipeline.metricas import metricas_matriz_b, metricas_de_matrices
-from .pipeline.data_loader import datos_matriz_a
-from .pipeline.matriz_c import matriz_c_builder, leer_metricas_matriz_b,actualizar_ultimo_dato_c
+from .instrumento_repository_metris import historico_instrumento_metris_api
+from ..pipeline.data_loader import datos_matriz_a, datos_historicos_por_instrumento, tiempo_actual
+from ..pipeline.matriz_c import leer_metricas_matriz_b
+from datetime import timedelta
 
 def historico_instrumento():#Para datos si necesita el Gilbert, sino para la casa nomas
     #Llamada a la API de "Metris" para obtener datos historicos de un instrumento
@@ -27,12 +24,6 @@ def historico_instrumento():#Para datos si necesita el Gilbert, sino para la cas
             "Content-Disposition": "attachment; filename=6248_2026.csv"
         }    ) """
     return df.to_dict(orient='records')  # Convertir el DataFrame a una lista de diccionarios
-
-def quality_code():
-    
-    return quality_code_metris_api()
-
-
 
 async def areas_unicas():#A visualizador
     df_response = datos_matriz_a()
@@ -68,36 +59,19 @@ async def instrumentos_por_subarea(subarea):#A visualizador
         "instrumentos":df_instrumentos.to_dict(orient='records')
     }
     return data
-async def datos_historicos_por_id(id,minutos):#A visualizador
-    data = await datos_historicos_por_instrumento(id,minutos)
-    print(data)
-    return
-
-async def matriz_b():
-    df_datos_instrumentos, df_medidas_estadisticas = await metricas_matriz_b()
-    data ={
-        "Observacion":"Se genero el CSV con las medidas estadisticas",
-        "datos_instrumentos": df_datos_instrumentos.to_dict(orient='records'),
-        "medidas_estadisticas": df_medidas_estadisticas.to_dict(orient='records')
-    }
-    return data
-
-async def matriz_datos_c():
-    datos_historicos_c,df_medidas_estadisticas = await matriz_c_builder() #data frame de datos historicos matriz C
-    return df_medidas_estadisticas
-
-async def actualizar_datos_matriz_c():
-    data = await actualizar_ultimo_dato_c()
-    return data
-
-async def diferencia_metricas():
-    data_matriz_b = leer_metricas_matriz_b()#Leemos CSV con medidas estadisticas y genera el DataFrame
-    data_matriz_c = await matriz_datos_c()#Leemos los ultimos datos de la matriz y traemos el DataFrame
-    
-    print("Matriz B \n",data_matriz_b)
-    print("Matriz C \n",data_matriz_c)
+async def informacion_instrumento(id):#A visualizador info del sensor y metricas
+    df_response = datos_matriz_a()
+    datos_instrumento = df_response[df_response["Identificador"] == id]
+    df_metricas_matriz_b = leer_metricas_matriz_b()
+    datos_metricas_instrumento = df_metricas_matriz_b[df_metricas_matriz_b["Identificador"] == id]
     data = {
-        "Metricas matriz B": data_matriz_b.to_dict(orient="records"),
-        "Metricas matriz C": data_matriz_c.to_dict(orient="records")
+        "informacion_general": datos_instrumento.to_dict(orient='records'),
+        "metricas_instrumento":datos_metricas_instrumento.to_dict(orient='records')
     }
     return data
+async def datos_historicos_por_id(id,minutos):#A visualizador
+    fecha_fin = tiempo_actual()
+    fecha_inicio = fecha_fin - timedelta(minutes=minutos)
+    periodo_muestreo_matriz_c = 50000000 #Muestreo de interpolación, cantidad de muestra por minuto (50000000 son 5 segundos)
+    data = await datos_historicos_por_instrumento(id,fecha_inicio,fecha_fin, periodo_muestreo_matriz_c)
+    return {"Datos historicos":data}

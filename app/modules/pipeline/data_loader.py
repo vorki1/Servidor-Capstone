@@ -1,7 +1,5 @@
 from app.core.config import settings
-import requests
-from datetime import datetime, timedelta, timezone
-from dateutil.relativedelta import relativedelta
+from datetime import datetime, timezone
 import urllib3
 import pandas as pd
 from pathlib import Path
@@ -12,10 +10,9 @@ import httpx
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-def quality_code_metris_api():
+async def quality_code_metris_api(id):
     hc = HistorianClient(base_uri=settings.METRIS_BASE_URI,token=lambda: settings.METRIS_TOKEN)
-    data = hc.get_tag_values(ids=6248)
-    print(data)
+    data = hc.get_tag_values(ids=id)
     return data
 
 #===========================================Lectura de datos historicos ==================================================================
@@ -25,7 +22,7 @@ def tiempo_actual():
     TIEMPO_CONGELADO = now
     return TIEMPO_CONGELADO
 
-async def datos_historicos_por_instrumento(instrumento_id,fecha_inicio, fecha_fin):# datos historicos
+async def datos_historicos_por_instrumento(instrumento_id, fecha_inicio, fecha_fin, periodo_muestreo):# datos historicos
     METRIS_BASE_URI = settings.METRIS_BASE_URI
     METRIS_TOKEN = settings.METRIS_TOKEN
     headers = {
@@ -40,7 +37,7 @@ async def datos_historicos_por_instrumento(instrumento_id,fecha_inicio, fecha_fi
         "InterpolationMethod": 0,
         "AggregateFunction": 1,#Cantidad de datos en el mismo json
         "InterpolationResolutionType": 1, #Cuantos puntos yo reconstruyo la serie de tiempo original
-        "interpolationresolution": 50000000 #Muestreo de interpolación, cantidad de muestra por minuto (600000000 es un minuto)
+        "interpolationresolution": periodo_muestreo #Muestreo de interpolación, cantidad de muestra por minuto (600000000 es un minuto)
     }
     async with httpx.AsyncClient(verify=False) as client:
         response = await client.get(url, headers=headers, params=params)
@@ -49,7 +46,7 @@ async def datos_historicos_por_instrumento(instrumento_id,fecha_inicio, fecha_fi
 
 #===================================================EXCEL Y GENERACION MATRIZ A ==========================================================
 def datos_excel_instrumentos_mapeados(): #Auxiliar de datos_matriz_a
-    BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent
     EXCEL_PATH = BASE_DIR / "data" / "TagsCNN_2026-04-30.xlsx"
     excel_instrumentos_mapeados = pd.read_excel(EXCEL_PATH)
     excel_instrumentos_mapeados.to_csv(EXCEL_PATH.with_suffix('.csv'), index=None, header=True)
@@ -69,6 +66,3 @@ def datos_matriz_a():#Matriz A con los datos sin identificador filtrados
     print("Leidos: matriz de excel de instrumentos mapeados...")
     #Mandamos objeto python de los datos del excel filtrados por los identificadores en 0 y columnas sin datos con "Vacio" o "0"
     return df_mapeo_instrumentos
-
-async def obtener_ultimo_elemento():
-    return

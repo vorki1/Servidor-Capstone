@@ -9,13 +9,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 TIEMPO_CONGELADO = 0
 
-hc = HistorianClient(base_uri=settings.METRIS_BASE_URI,token=lambda: settings.METRIS_TOKEN)
-
-def quality_code_metris_api():
-    
-    data = hc.get_tag_values(ids=6248)
-    print(data)
-    return data
 
 def historico_instrumento_metris_api():
     METRIS_BASE_URI = settings.METRIS_BASE_URI

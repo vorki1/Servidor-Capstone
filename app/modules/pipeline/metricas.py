@@ -1,4 +1,6 @@
 from .matriz_main_builder import construccion_matriz_b
+from .data_loader import quality_code_metris_api
+import asyncio
 import math
 import pandas as pd
 from datetime import datetime, timedelta
@@ -9,7 +11,7 @@ def metrics_save(df_metricas):#Aux para guardar las metricas de la matriz main (
     # Archivo actual
     ruta_actual = Path(__file__).resolve()
     ruta_csv = (
-        ruta_actual.parent.parent.parent.parent
+        ruta_actual.parent.parent.parent
         / "data"
         / "metricas_matriz_b.csv"
     )
@@ -58,7 +60,17 @@ def calcular_z_score(valor, media, desviacion_estandar): #Aux para calcular z-sc
         # activar alerta
     return z_score
 
-def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular las metricas de cualquier matriz de datos
+async def integracion_quality_code(id):
+    data = await quality_code_metris_api(id)
+
+    if not data:
+        return None
+    return {
+        "identificador": id,
+        "Quality_code": data[0]["quality"],
+    }
+
+async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular las metricas de cualquier matriz de datos
 
     #=================================Acscendente=========================================
     cols = df_datos_matriz.columns.drop("Identificador")
@@ -77,7 +89,38 @@ def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular las metr
     
     #Trabajo n°2 calcular medidas estadisticas para cada instrumento
     valores = df_datos_matriz.drop(columns=["Identificador"])
-    #============ media y desviación estándar====================================
+    #================= Quality Code =============================================
+    # =========================
+    # Obtención concurrente
+    # =========================
+    identificadores = df_medidas_estadisticas["Identificador"].to_list()
+    tasks = [#Esto crea ordenes de hacer algo, pero no lo hace aún
+            integracion_quality_code(id)
+            for id in identificadores
+        ]
+    resultados = await asyncio.gather(*tasks, return_exceptions=True)#Esto es el trabajo todo junto y concurrente
+    registros = []
+    for resultado in resultados:
+        if isinstance(resultado, Exception):
+            print(resultado)
+            continue
+        if resultado is None:
+            continue
+        registros.append({
+            "Identificador": resultado["identificador"],
+            "Quality_code": resultado["Quality_code"]
+        })
+    if registros:
+        df_quality = pd.DataFrame(registros)
+
+        df_medidas_estadisticas = df_medidas_estadisticas.merge(
+            df_quality,
+            on="Identificador",
+            how="left"
+        )
+    else:
+        df_medidas_estadisticas["Quality_Code"] = None
+    #============ Media y Desviación Estándar====================================
     df_medidas_estadisticas["Media"] = valores.mean(axis=1).round(3)
     df_medidas_estadisticas["Desviacion_Estandar"] = valores.std(axis=1).round(3)
 
@@ -111,7 +154,7 @@ def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular las metr
 
 async def metricas_matriz_b():
     df_datos_matriz_b = await construccion_matriz_b() #Datos historicos matriz B
-    df_medidas_estadisticas = metricas_de_matrices(df_datos_matriz_b) #Medidas estadisticas
+    df_medidas_estadisticas = await metricas_de_matrices(df_datos_matriz_b) #Medidas estadisticas
     metrics_save(df_medidas_estadisticas)#Almacenar medidas estadisticas
     print("Envio la matriz B con sus métricas")
     return df_datos_matriz_b, df_medidas_estadisticas
