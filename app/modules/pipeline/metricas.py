@@ -5,9 +5,12 @@ import math
 import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
+from app.core.logger import crear_logger
+
+logger = crear_logger("Pipeline")
 
 def metrics_save(df_metricas):#Aux para guardar las metricas de la matriz main ([B])
-    print("====Medidas estadisticas guardadas=====")
+    logger.info("====Medidas estadisticas de la matriz [B] guardadas=====")
     # Archivo actual
     ruta_actual = Path(__file__).resolve()
     ruta_csv = (
@@ -24,7 +27,7 @@ def metrics_save(df_metricas):#Aux para guardar las metricas de la matriz main (
             ruta_csv,
             index=False
         )
-        print("CSV creado correctamente")
+        logger.info("CSV creado correctamente")
         return
 
     # =========================
@@ -35,7 +38,7 @@ def metrics_save(df_metricas):#Aux para guardar las metricas de la matriz main (
     )
     fecha_actual = datetime.now()
     diferencia = fecha_actual - fecha_modificacion
-    print(f"fecha de la creacion del archivo csv:{fecha_modificacion}, fecha actual:{fecha_actual}, la diferencia entre fechas{diferencia}")
+    logger.info(f"Fecha de la creacion del archivo csv: {fecha_modificacion}, fecha actual: {fecha_actual}, la diferencia entre fechas: {diferencia}")
     # =========================
     # Sobrescribir si pasó 1 mes
     # =========================
@@ -44,11 +47,10 @@ def metrics_save(df_metricas):#Aux para guardar las metricas de la matriz main (
             ruta_csv,
             index=False
         )
-        print("CSV actualizado después de 1 mes")
+        logger.info("CSV actualizado después de 1 mes")
     else:
-        print("No ha pasado 1 mes, no se actualiza CSV")
+        logger.info("No ha pasado 1 mes, no se actualiza CSV")
     return
-
 def redondeo_arriba_abs(x):#Aux para redondear el z-score
     return math.ceil(x * 100) / 100
 def calcular_z_score(valor, media, desviacion_estandar): #Aux para calcular z-score
@@ -59,7 +61,6 @@ def calcular_z_score(valor, media, desviacion_estandar): #Aux para calcular z-sc
         pass
         # activar alerta
     return z_score
-
 async def integracion_quality_code(id):
     data = await quality_code_metris_api(id)
 
@@ -69,9 +70,7 @@ async def integracion_quality_code(id):
         "identificador": id,
         "Quality_code": data[0]["quality"],
     }
-
 async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular las metricas de cualquier matriz de datos
-
     #=================================Acscendente=========================================
     cols = df_datos_matriz.columns.drop("Identificador")
     cols_sorted = sorted(cols)  # ascendente
@@ -151,10 +150,8 @@ async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular la
         z_score = calcular_z_score(ultimo_valor, media, desviacion_estandar) #Posible envio de alerta
      """
     return df_medidas_estadisticas
-
 async def metricas_matriz_b():
     df_datos_matriz_b = await construccion_matriz_b() #Datos historicos matriz B
     df_medidas_estadisticas = await metricas_de_matrices(df_datos_matriz_b) #Medidas estadisticas
     metrics_save(df_medidas_estadisticas)#Almacenar medidas estadisticas
-    print("Envio la matriz B con sus métricas")
     return df_datos_matriz_b, df_medidas_estadisticas

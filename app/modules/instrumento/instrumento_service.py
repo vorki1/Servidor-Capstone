@@ -36,7 +36,6 @@ async def subareas_de_area(area):#A visualizador
     df_response = datos_matriz_a()
     df_filtrado = df_response[df_response["Area"] == area]        
     subareas = df_filtrado["Sub"].unique().tolist()
-    print(subareas)
     data = {
         "area":area,
         "subareas":subareas
@@ -59,6 +58,8 @@ async def instrumentos_por_subarea(subarea):#A visualizador
         "instrumentos":df_instrumentos.to_dict(orient='records')
     }
     return data
+async def instrumentos_por_sistema(sistema):#A visualizador °°°°°°°°°°°°Falta por ver°°°°°°°°°°°°°°°°°°°°°°°°°
+    return
 async def informacion_instrumento(id):#A visualizador info del sensor y metricas
     df_response = datos_matriz_a()
     datos_instrumento = df_response[df_response["Identificador"] == id]

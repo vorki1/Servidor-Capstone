@@ -50,7 +50,6 @@ def historico_instrumento_metris_api():
     }
     response = requests.get(url, headers=headers, params=params, verify=False)
     data = response.json()
-    print(data)
     return data
 
 

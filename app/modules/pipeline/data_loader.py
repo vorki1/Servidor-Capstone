@@ -21,7 +21,6 @@ def tiempo_actual():
     now = datetime.now(timezone.utc)
     TIEMPO_CONGELADO = now
     return TIEMPO_CONGELADO
-
 async def datos_historicos_por_instrumento(instrumento_id, fecha_inicio, fecha_fin, periodo_muestreo):# datos historicos
     METRIS_BASE_URI = settings.METRIS_BASE_URI
     METRIS_TOKEN = settings.METRIS_TOKEN
@@ -51,9 +50,7 @@ def datos_excel_instrumentos_mapeados(): #Auxiliar de datos_matriz_a
     excel_instrumentos_mapeados = pd.read_excel(EXCEL_PATH)
     excel_instrumentos_mapeados.to_csv(EXCEL_PATH.with_suffix('.csv'), index=None, header=True)
     df_instrumentos_mapeados = pd.read_csv(EXCEL_PATH.with_suffix('.csv')).convert_dtypes()
-    #Se retorna el dataframe leido
     return df_instrumentos_mapeados
-
 def datos_matriz_a():#Matriz A con los datos sin identificador filtrados
 
     df_mapeo_instrumentos = datos_excel_instrumentos_mapeados() #Aca es un dataframe
@@ -63,6 +60,4 @@ def datos_matriz_a():#Matriz A con los datos sin identificador filtrados
     df_mapeo_instrumentos[cols_num] = df_mapeo_instrumentos[cols_num].fillna(0)
     df_mapeo_instrumentos = df_mapeo_instrumentos.rename(columns={"ID": "Identificador"})
     df_mapeo_instrumentos = df_mapeo_instrumentos[df_mapeo_instrumentos["Identificador"] > 0] #Se eliminan los instrumentos con identificador 0
-    print("Leidos: matriz de excel de instrumentos mapeados...")
-    #Mandamos objeto python de los datos del excel filtrados por los identificadores en 0 y columnas sin datos con "Vacio" o "0"
     return df_mapeo_instrumentos
