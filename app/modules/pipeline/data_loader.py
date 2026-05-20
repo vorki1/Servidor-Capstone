@@ -12,13 +12,13 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 async def quality_code_metris_api(id):
     hc = HistorianClient(base_uri=settings.METRIS_BASE_URI,token=lambda: settings.METRIS_TOKEN)
-    data = hc.get_tag_values(ids=id)
+    data = hc.get_tag_values(ids=int(id))
     return data
 
 #===========================================Lectura de datos historicos ==================================================================
 TIEMPO_CONGELADO = 0
 def tiempo_actual():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
     TIEMPO_CONGELADO = now
     return TIEMPO_CONGELADO
 async def datos_historicos_por_instrumento(instrumento_id, fecha_inicio, fecha_fin, periodo_muestreo):# datos historicos
@@ -46,7 +46,7 @@ async def datos_historicos_por_instrumento(instrumento_id, fecha_inicio, fecha_f
 #===================================================EXCEL Y GENERACION MATRIZ A ==========================================================
 def datos_excel_instrumentos_mapeados(): #Auxiliar de datos_matriz_a
     BASE_DIR = Path(__file__).resolve().parent.parent.parent
-    EXCEL_PATH = BASE_DIR / "data" / "TagsCNN_2026-04-30.xlsx"
+    EXCEL_PATH = BASE_DIR / "data" / "TagsCNN_2026-04-30_area_seca.xlsx"
     excel_instrumentos_mapeados = pd.read_excel(EXCEL_PATH)
     excel_instrumentos_mapeados.to_csv(EXCEL_PATH.with_suffix('.csv'), index=None, header=True)
     df_instrumentos_mapeados = pd.read_csv(EXCEL_PATH.with_suffix('.csv')).convert_dtypes()
@@ -58,6 +58,30 @@ def datos_matriz_a():#Matriz A con los datos sin identificador filtrados
     df_mapeo_instrumentos[cols_str] = df_mapeo_instrumentos[cols_str].fillna("Vacio").apply(lambda col: col.str.strip())
     cols_num = df_mapeo_instrumentos.select_dtypes(include=[np.number]).columns
     df_mapeo_instrumentos[cols_num] = df_mapeo_instrumentos[cols_num].fillna(0)
-    df_mapeo_instrumentos = df_mapeo_instrumentos.rename(columns={"ID": "Identificador"})
     df_mapeo_instrumentos = df_mapeo_instrumentos[df_mapeo_instrumentos["Identificador"] > 0] #Se eliminan los instrumentos con identificador 0
     return df_mapeo_instrumentos
+
+def subarea_chancado_primario():
+    df_general_a = datos_matriz_a()
+    df_subarea_chancado_primario = df_general_a[df_general_a["Subarea"] == "Chancado Primario"]
+    return df_subarea_chancado_primario
+def subarea_chancado_secundario():
+    df_general_a = datos_matriz_a()
+    df_subarea_chancado_secundario = df_general_a[df_general_a["Subarea"] == "Chancado Secundario"]
+    return df_subarea_chancado_secundario
+def subarea_chancado_terciario():
+    df_general_a = datos_matriz_a()
+    df_subarea_chancado_terciario = df_general_a[df_general_a["Subarea"] == "Chancado Terciario"]
+    return df_subarea_chancado_terciario
+def subarea_chancado_cuaternario():
+    df_general_a = datos_matriz_a()
+    df_subarea_chancado_cuaternario = df_general_a[df_general_a["Subarea"] == "Chancado Cuaternario"]
+    return df_subarea_chancado_cuaternario
+def subarea_molienda_cuaternaria():
+    df_general_a = datos_matriz_a()
+    df_subarea_molienda_cuaternaria = df_general_a[df_general_a["Subarea"] == "Molienda Cuaternaria"]
+    return df_subarea_molienda_cuaternaria
+def subarea_acopio_fino():
+    df_general_a = datos_matriz_a()
+    df_subarea_acopio_fino = df_general_a[df_general_a["Subarea"] == "Acopio Fino"]
+    return df_subarea_acopio_fino

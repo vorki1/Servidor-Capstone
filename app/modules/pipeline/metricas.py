@@ -42,7 +42,7 @@ def metrics_save(df_metricas):#Aux para guardar las metricas de la matriz main (
     # =========================
     # Sobrescribir si pasó 1 mes
     # =========================
-    if diferencia >= timedelta(days=30):#Aca verifico el tiempo cada 1 mes
+    if diferencia >= timedelta(minutes=1):#Aca verifico el tiempo cada 1 mes
         df_metricas.to_csv(
             ruta_csv,
             index=False
@@ -63,7 +63,7 @@ def calcular_z_score(valor, media, desviacion_estandar): #Aux para calcular z-sc
     return z_score
 async def integracion_quality_code(id):
     data = await quality_code_metris_api(id)
-
+    print(data)
     if not data:
         return None
     return {
@@ -71,10 +71,12 @@ async def integracion_quality_code(id):
         "Quality_code": data[0]["quality"],
     }
 async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular las metricas de cualquier matriz de datos
+    df_datos_matriz = df_datos_matriz.reset_index(drop=True)
     #=================================Acscendente=========================================
     cols = df_datos_matriz.columns.drop("Identificador")
     cols_sorted = sorted(cols)  # ascendente
     df_datos_matriz = df_datos_matriz[["Identificador"] + cols_sorted]
+    
     #=====================================================================================
     df_medidas_estadisticas = pd.DataFrame({
         "Identificador": pd.Series(dtype="Int64"),  # entero
@@ -83,8 +85,10 @@ async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular la
     })
 
     #Trabajo n°1 añadir identificadores a cada fila de la matriz de metricas
-    df_medidas_estadisticas["Identificador"] = df_datos_matriz["Identificador"]
-    df_medidas_estadisticas=df_medidas_estadisticas.fillna(0)
+    df_medidas_estadisticas["Identificador"] = (
+        df_datos_matriz["Identificador"]
+        .astype("Int64")
+    )
     
     #Trabajo n°2 calcular medidas estadisticas para cada instrumento
     valores = df_datos_matriz.drop(columns=["Identificador"])
@@ -101,7 +105,6 @@ async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular la
     registros = []
     for resultado in resultados:
         if isinstance(resultado, Exception):
-            print(resultado)
             continue
         if resultado is None:
             continue
@@ -109,49 +112,51 @@ async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular la
             "Identificador": resultado["identificador"],
             "Quality_code": resultado["Quality_code"]
         })
+    print(registros)
     if registros:
         df_quality = pd.DataFrame(registros)
-
         df_medidas_estadisticas = df_medidas_estadisticas.merge(
             df_quality,
             on="Identificador",
             how="left"
         )
+
     else:
         df_medidas_estadisticas["Quality_Code"] = None
     #============ Media y Desviación Estándar====================================
-    df_medidas_estadisticas["Media"] = valores.mean(axis=1).round(3)
-    df_medidas_estadisticas["Desviacion_Estandar"] = valores.std(axis=1).round(3)
+    df_medidas_estadisticas["Media"] = valores.mean(axis=1, skipna=True).round(3)
+    df_medidas_estadisticas["Desviacion_Estandar"] = valores.std(axis=1, skipna=True).round(3)
 
     #============ Gradiente ====================================================
     valores_sorted = valores[cols_sorted]  # Datos ordenados, sin la columna identificador
     gradiente = valores_sorted.diff(axis=1)
-    gradiente = gradiente.fillna(0)
 
     df_gradiente = pd.DataFrame({
         "Identificador": df_datos_matriz["Identificador"],
-        "Gradiente_Promedio": gradiente.mean(axis=1).round(3),
-        "Gradiente_Max": gradiente.abs().max(axis=1).round(3),
-        "Gradiente_Intensidad": gradiente.abs().mean(axis=1).round(3),
+        "Gradiente_Promedio": gradiente.mean(axis=1, skipna=True).round(3),
+        "Gradiente_Max": gradiente.abs().max(axis=1, skipna=True).round(3),
+        "Gradiente_Intensidad": gradiente.abs().mean(axis=1, skipna=True).round(3),
     })
     df_medidas_estadisticas = df_medidas_estadisticas.merge(
         df_gradiente,
         on="Identificador",
         how="left"
     )
-
-    """     for identificador in df_datos_matriz["Identificador"]: #Calculo del z_score para el ultimo valor de cada instrumento
-        desviacion_estandar = df_medidas_estadisticas.loc[df_medidas_estadisticas["Identificador"]== identificador, "Desviacion_Estandar"].values[0]
-        if abs(desviacion_estandar) < 1e-10:
-            desviacion_estandar = 0
-        media = round(df_medidas_estadisticas.loc[df_medidas_estadisticas["Identificador"]==identificador, "Media"].values[0],3)
-        #fila_medidas = df_medidas_estadisticas.loc[df_medidas_estadisticas["Identificador"]==identificador]
-        ultimo_valor = df_datos_matriz.loc[df_datos_matriz["Identificador"]==identificador].iloc[:, -1].values[0]
-        z_score = calcular_z_score(ultimo_valor, media, desviacion_estandar) #Posible envio de alerta
-     """
     return df_medidas_estadisticas
+
 async def metricas_matriz_b():
     df_datos_matriz_b = await construccion_matriz_b() #Datos historicos matriz B
     df_medidas_estadisticas = await metricas_de_matrices(df_datos_matriz_b) #Medidas estadisticas
     metrics_save(df_medidas_estadisticas)#Almacenar medidas estadisticas
     return df_datos_matriz_b, df_medidas_estadisticas
+
+
+"""     for identificador in df_datos_matriz["Identificador"]: #Calculo del z_score para el ultimo valor de cada instrumento
+    desviacion_estandar = df_medidas_estadisticas.loc[df_medidas_estadisticas["Identificador"]== identificador, "Desviacion_Estandar"].values[0]
+    if abs(desviacion_estandar) < 1e-10:
+        desviacion_estandar = 0
+    media = round(df_medidas_estadisticas.loc[df_medidas_estadisticas["Identificador"]==identificador, "Media"].values[0],3)
+    #fila_medidas = df_medidas_estadisticas.loc[df_medidas_estadisticas["Identificador"]==identificador]
+    ultimo_valor = df_datos_matriz.loc[df_datos_matriz["Identificador"]==identificador].iloc[:, -1].values[0]
+    z_score = calcular_z_score(ultimo_valor, media, desviacion_estandar) #Posible envio de alerta
+    """
