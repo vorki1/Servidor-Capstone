@@ -4,11 +4,19 @@ import urllib3
 import pandas as pd
 from pathlib import Path
 import numpy as np
-from app.infrastructure.metrisapi.historian import HistorianClient
+from app.infrastructure.metrisapi.historian import (
+    HistorianClient,
+    TrendValuesParameters,
+    AggregateFunction,
+    InterpolationMethod,
+    InterpolationResolutionType,
+    ticks_from
+)
 import httpx
 #######CRITICO!!!!!!!!!!!!!!!##################################
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+hc = HistorianClient(base_uri=settings.METRIS_BASE_URI,token=lambda: settings.METRIS_TOKEN)
 
 async def quality_code_metris_api(id):
     hc = HistorianClient(base_uri=settings.METRIS_BASE_URI,token=lambda: settings.METRIS_TOKEN)
@@ -21,7 +29,7 @@ def tiempo_actual():
     now = datetime.now(timezone.utc).replace(microsecond=0)
     TIEMPO_CONGELADO = now
     return TIEMPO_CONGELADO
-async def datos_historicos_por_instrumento(instrumento_id, fecha_inicio, fecha_fin, periodo_muestreo):# datos historicos
+""" async def datos_historicos_por_instrumento(instrumento_id, fecha_inicio, fecha_fin, periodo_muestreo):# datos historicos
     METRIS_BASE_URI = settings.METRIS_BASE_URI
     METRIS_TOKEN = settings.METRIS_TOKEN
     headers = {
@@ -41,6 +49,21 @@ async def datos_historicos_por_instrumento(instrumento_id, fecha_inicio, fecha_f
     async with httpx.AsyncClient(verify=False) as client:
         response = await client.get(url, headers=headers, params=params)
     data = response.json()
+    return data """
+
+async def datos_historicos_por_instrumento(instrumento_id, fecha_inicio, fecha_fin, minutos_muestreo,segundos_muestreo):# datos historicos
+    params = TrendValuesParameters(
+        tag_id=instrumento_id,
+        start=fecha_inicio,
+        end=fecha_fin,
+
+        interpolation_method=InterpolationMethod.linear,
+        interpolation_resolution=ticks_from(minutes=minutos_muestreo,seconds=segundos_muestreo),
+        interpolation_resolution_type=InterpolationResolutionType.ticks,
+        aggregate_function=AggregateFunction.median
+    )
+    data = hc.get_trend_values(params)
+    
     return data
 
 #===================================================EXCEL Y GENERACION MATRIZ A ==========================================================
@@ -85,3 +108,11 @@ def subarea_acopio_fino():
     df_general_a = datos_matriz_a()
     df_subarea_acopio_fino = df_general_a[df_general_a["Subarea"] == "Acopio Fino"]
     return df_subarea_acopio_fino
+
+#Tags que no tienen datos de metris
+#30695,26998,26995,78517,78503,27010,27007,27004,26996,27023,78518,32342,78502,24560,24556,24559,24558,23939,23935,23849,23848,9094,9092,9093
+#9091,9066,9044,9060,8952,9023,9022,8949,6312,6297,6302,5275,5273,5274,5272,5269,5016,5012,5010,5268,5081,5009,5013,5270,5015,5011,5271,5014
+#5267,5008,4938,4937,4904,4936,4903,4902,4901,4935,4900,4899
+
+#Tags con datos que no llegan de metris
+#89930,90519,90520,85446,8958,6299,6288

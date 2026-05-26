@@ -1,55 +1,81 @@
-from .matriz_main_builder import construccion_matriz_b
 from .data_loader import quality_code_metris_api
 import asyncio
 import math
 import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
-from app.core.logger import crear_logger
 
+from app.core.logger import crear_logger
 logger = crear_logger("Pipeline")
 
-def metrics_save(df_metricas):#Aux para guardar las metricas de la matriz main ([B])
-    logger.info("====Medidas estadisticas de la matriz [B] guardadas=====")
-    # Archivo actual
+def metrics_save(df_metricas):
+
+    logger.info("==== Guardando métricas matriz B =====")
+
     ruta_actual = Path(__file__).resolve()
+
     ruta_csv = (
         ruta_actual.parent.parent.parent
         / "data"
         / "metricas_matriz_b.csv"
     )
+
+    ruta_csv.parent.mkdir(parents=True,exist_ok=True)
     # =========================
-    # Archivo en caso que no exista
+    # Crear CSV si no existe
     # =========================
     if not ruta_csv.exists():
-        ruta_csv.parent.mkdir(parents=True, exist_ok=True)
-        df_metricas.to_csv(
-            ruta_csv,
-            index=False
-        )
+        df_metricas.to_csv(ruta_csv,index=False)
         logger.info("CSV creado correctamente")
         return
-
     # =========================
-    # Revisar fecha modificación si existe
+    # Revisar tiempo modificación
     # =========================
-    fecha_modificacion = datetime.fromtimestamp(
-        ruta_csv.stat().st_mtime
-    )
+    fecha_modificacion = datetime.fromtimestamp(ruta_csv.stat().st_mtime)
     fecha_actual = datetime.now()
     diferencia = fecha_actual - fecha_modificacion
-    logger.info(f"Fecha de la creacion del archivo csv: {fecha_modificacion}, fecha actual: {fecha_actual}, la diferencia entre fechas: {diferencia}")
+    logger.info(f"Última modificación CSV: {fecha_modificacion} | "f"Ahora: {fecha_actual} | "f"Diferencia: {diferencia}")
+
     # =========================
-    # Sobrescribir si pasó 1 mes
+    # No actualizar antes de 1 minuto
     # =========================
-    if diferencia >= timedelta(minutes=1):#Aca verifico el tiempo cada 1 mes
-        df_metricas.to_csv(
-            ruta_csv,
-            index=False
-        )
-        logger.info("CSV actualizado después de 1 mes")
-    else:
-        logger.info("No ha pasado 1 mes, no se actualiza CSV")
+    if diferencia < timedelta(minutes=1):
+        logger.info("No ha pasado 1 minuto, no se actualiza CSV")
+        return
+    # =========================
+    # Leer CSV actual
+    # =========================
+    df_existente = pd.read_csv(ruta_csv)
+    # =========================
+    # IDs existentes y nuevos
+    # =========================
+    ids_existentes = set(df_existente["Identificador"])
+    ids_nuevos = set(df_metricas["Identificador"])
+    # =========================
+    # Comparaciones
+    # =========================
+    ids_actualizados = ids_existentes.intersection(ids_nuevos)
+    ids_completamente_nuevos = ids_nuevos.difference(ids_existentes)
+    ids_no_actualizados = ids_existentes.difference(ids_nuevos)
+    # =========================
+    # Logs métricas actualización
+    # =========================
+    logger.info(f"Sensores existentes en CSV: "f"{len(ids_existentes)}")
+    logger.info(f"Sensores recibidos en iteración: "f"{len(ids_nuevos)}")
+    logger.info(f"Sensores actualizados: "f"{len(ids_actualizados)}")
+    logger.info(f"Sensores nuevos agregados: "f"{len(ids_completamente_nuevos)}")
+    logger.info(f"Sensores conservados sin cambios: "f"{len(ids_no_actualizados)}")
+
+    # =========================
+    # Eliminar SOLO esos IDs
+    # =========================
+    df_existente = df_existente[~df_existente["Identificador"].isin(ids_nuevos)]
+    # =========================
+    # Concatenar datos nuevos
+    # =========================
+    df_final = pd.concat([df_existente, df_metricas],ignore_index=True)
+    logger.info(f"Total sensores finales: "f"{len(df_final)}")
+    # =========================
     return
 def redondeo_arriba_abs(x):#Aux para redondear el z-score
     return math.ceil(x * 100) / 100
@@ -63,7 +89,6 @@ def calcular_z_score(valor, media, desviacion_estandar): #Aux para calcular z-sc
     return z_score
 async def integracion_quality_code(id):
     data = await quality_code_metris_api(id)
-    print(data)
     if not data:
         return None
     return {
@@ -112,7 +137,6 @@ async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular la
             "Identificador": resultado["identificador"],
             "Quality_code": resultado["Quality_code"]
         })
-    print(registros)
     if registros:
         df_quality = pd.DataFrame(registros)
         df_medidas_estadisticas = df_medidas_estadisticas.merge(
@@ -144,11 +168,7 @@ async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular la
     )
     return df_medidas_estadisticas
 
-async def metricas_matriz_b():
-    df_datos_matriz_b = await construccion_matriz_b() #Datos historicos matriz B
-    df_medidas_estadisticas = await metricas_de_matrices(df_datos_matriz_b) #Medidas estadisticas
-    metrics_save(df_medidas_estadisticas)#Almacenar medidas estadisticas
-    return df_datos_matriz_b, df_medidas_estadisticas
+
 
 
 """     for identificador in df_datos_matriz["Identificador"]: #Calculo del z_score para el ultimo valor de cada instrumento

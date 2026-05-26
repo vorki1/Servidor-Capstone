@@ -1,8 +1,10 @@
-from .matriz_main_builder import tiempo_actual, obtener_historico, generar_dataframe_datos_historicos
+from .matriz_main_builder import obtener_historico, generar_dataframe_datos_historicos
 from .metricas import metricas_de_matrices
+from .data_loader import tiempo_actual
 from datetime import timedelta, datetime, timezone
 from pathlib import Path
 import pandas as pd
+import numpy as np
 from app.core.logger import crear_logger
 
 logger = crear_logger("Pipeline")
@@ -30,8 +32,8 @@ async def matriz_c_builder():
     df_metricas_b = leer_metricas_matriz_b()#Dataframe metricas de la matriz B
     fecha_fin = tiempo_actual()
     fecha_inicio = fecha_fin - timedelta(minutes=15)
-    periodo_muestreo_matriz_c = 50000000 #Muestreo de interpolación, cantidad de muestra por minuto (50000000 son 5 segundos)
-    df_matriz_c_datos = await generar_dataframe_datos_historicos(df_metricas_b,fecha_inicio,fecha_fin,periodo_muestreo_matriz_c)
+    periodo_muestreo_matriz_c = 5 #Muestreo de interpolación, cantidad de muestra por minuto (50000000 son 5 segundos)
+    df_matriz_c_datos = await generar_dataframe_datos_historicos(df_metricas_b,fecha_inicio,fecha_fin,0,periodo_muestreo_matriz_c)
     save_data(df_matriz_c_datos)
     df_medidas_estadisticas = await metricas_de_matrices(df_matriz_c_datos)
     return df_matriz_c_datos,df_medidas_estadisticas
@@ -57,6 +59,42 @@ async def actualizar_ultimo_dato_c():
     )
     save_data(df_datos_matriz_c)
     return "Información actualizada"
+
+def detectar_cambio_brusco(df):
+    print(df.head())
+    # Evitar división por cero
+    epsilon = 1e-6
+    # =========================
+    # Ratios
+    # =========================
+    df["Ratio_STD"] = (
+        df["Desviacion_Estandar_c"]
+        /
+        (df["Desviacion_Estandar_b"] + epsilon)
+    ).round(3)
+
+    df["Ratio_Gradiente"] = ( #El promedio de variacion del instrumento
+        df["Gradiente_Intensidad_c"]
+        /
+        (df["Gradiente_Intensidad_b"] + epsilon)
+    ).round(3)
+    print(
+        df[
+            [
+                "Identificador",
+                "Ratio_STD",
+                "Ratio_Gradiente"
+            ]
+        ]
+    )
+
+    return df
+
+def detectar_oscilacion(df):
+    return df
+def detectar_sensor_congelado(df):
+    return df
+
 def diferencia_matriz_b_matriz_c(df_matriz_b, df_matriz_c):
     # Unir por identificador
     df_merge = df_matriz_b.merge(
@@ -64,7 +102,11 @@ def diferencia_matriz_b_matriz_c(df_matriz_b, df_matriz_c):
         on="Identificador",
         suffixes=("_b", "_c")
     )
-    # Crear dataframe resultado
+    df_merge = detectar_cambio_brusco(df_merge)
+    df_merge = df_merge.replace({np.nan: None})
+    return df_merge
+
+"""     # Crear dataframe resultado
     df_diferencia = pd.DataFrame()
     # Mantener identificador
     df_diferencia["Identificador"] = df_merge["Identificador"]
@@ -87,5 +129,4 @@ def diferencia_matriz_b_matriz_c(df_matriz_b, df_matriz_c):
     df_diferencia["Diff_Gradiente_Intensidad"] = (
         df_merge["Gradiente_Intensidad_c"] -
         df_merge["Gradiente_Intensidad_b"]
-    ).round(3)
-    return df_diferencia
+    ).round(3) """

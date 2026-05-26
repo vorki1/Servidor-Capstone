@@ -1,6 +1,6 @@
 {
     "Chancado Primario":[
-        {"CR-01":"SERVER_OSS01M::3200_CR_0001_MO/M2.RunSig#Value"},
+        {"CR-01:8954":"SERVER_OSS01M::3200_CR_0001_MO/M2.RunSig#Value"},
         {"CV-01":"SERVER_OSS01M::3200_CV_0001/M4.RunSig#Value"},
         {"FE-01":""},
         {"PU-1110":"SERVER_OSS01M::3200_PU_1110_MO/Corriente.PV_Out#Value"},

@@ -35,7 +35,7 @@ async def areas_unicas():#A visualizador
 async def subareas_de_area(area):#A visualizador
     df_response = datos_matriz_a()
     df_filtrado = df_response[df_response["Area"] == area]        
-    subareas = df_filtrado["Sub"].unique().tolist()
+    subareas = df_filtrado["Subarea"].unique().tolist()
     data = {
         "area":area,
         "subareas":subareas
@@ -43,7 +43,7 @@ async def subareas_de_area(area):#A visualizador
     return data
 async def instrumentos_por_subarea(subarea):#A visualizador
     df_response = datos_matriz_a()
-    df_instrumentos = df_response[df_response["Sub"]==subarea]
+    df_instrumentos = df_response[df_response["Subarea"]==subarea]
     area = df_instrumentos["Area"].unique()
     obs = ""
     if len(area) > 1:

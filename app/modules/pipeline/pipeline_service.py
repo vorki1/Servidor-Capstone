@@ -1,4 +1,4 @@
-from ..pipeline.metricas import metricas_matriz_b
+from ..pipeline.matriz_b import metricas_matriz_b
 from ..pipeline.matriz_c import matriz_c_builder, leer_metricas_matriz_b,actualizar_ultimo_dato_c, diferencia_matriz_b_matriz_c
 import numpy as np
 
@@ -22,4 +22,4 @@ async def diferencia_metricas(): #Diferencia para analizar matriz B y matriz C
     data_matriz_b = leer_metricas_matriz_b()#Leemos CSV con medidas estadisticas y genera el DataFrame
     data_matriz_c = await matriz_datos_c()#Leemos los ultimos datos de la matriz y traemos el DataFrame
     df_diferencia_matriz_b_matriz_c = diferencia_matriz_b_matriz_c(data_matriz_b,data_matriz_c)
-    return df_diferencia_matriz_b_matriz_c
+    return df_diferencia_matriz_b_matriz_c.to_dict(orient="records")
