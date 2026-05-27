@@ -7,6 +7,7 @@ logger = crear_logger("Pipeline")
 def limpiar_columna(columna):
     print("Limpiamos los datos de la columna")
     return columna
+
 def filtrar_chancado_primario(df_historico):
 
     print("Soy el chancado primario")
@@ -43,7 +44,7 @@ def filtrar_chancado_primario(df_historico):
         valor_9092 = control_9092[timestamp]
         # Si cualquiera está detenido
         if valor_8954 <= 0.5 or valor_8975 <= 0.5 or valor_9092 <= 700:
-            print(f"En timestamp {timestamp} alguno de los controles está detenido. Marcando como NaN.{valor_8954}, {valor_8975}, {valor_9092}")
+            #print(f"En timestamp {timestamp} alguno de los controles está detenido. Marcando como NaN.{valor_8954}, {valor_8975}, {valor_9092}")
             # No modificar las filas de control
             mascara = ~df_historico["Identificador"].isin([8954, 8975, 9092])
             # Poner NaN
@@ -62,7 +63,7 @@ def filtrar_datos_historicos(df_datos_historicos, subarea):
     funcion = ACCIONES_SUBAREA.get(subarea)
     if funcion:
         resultado = funcion(df_datos_historicos)
-        print("Resultado del filtrado:\n", resultado)
+        #print("Resultado del filtrado:\n", resultado)
         return resultado
     else:
         logger.warning(f"No existe accion para subarea: {subarea}")

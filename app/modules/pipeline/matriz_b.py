@@ -16,13 +16,13 @@ from .metricas import metricas_de_matrices, metrics_save
 from app.core.logger import crear_logger
 logger = crear_logger("Pipeline")
 
-async def construccion_matriz_b():#Se construye la matriz B con datos historicos
+async def construccion_datos_matriz_b():#Se construye la matriz B con datos historicos
     fecha_fin = tiempo_actual()
     fecha_inicio = fecha_fin - relativedelta(days=2)
     periodo_muestreo_matriz_b = 1 #Muestreo de interpolación, cantidad de muestra por minuto (600000000 es un minuto)
-    df_matriz_a = subarea_chancado_primario() #Entrega un DF
-    df_matriz_a_datos = await generar_dataframe_datos_historicos(df_matriz_a, fecha_inicio, fecha_fin, periodo_muestreo_matriz_b,segundos_muestreo=0)
-    subarea = df_matriz_a["Subarea"].iloc[0]
+    df_matriz_a_chancado_primario = subarea_chancado_primario() #Entrega un DF
+    df_matriz_a_datos = await generar_dataframe_datos_historicos(df_matriz_a_chancado_primario, fecha_inicio, fecha_fin, periodo_muestreo_matriz_b,segundos_muestreo=0)
+    subarea = df_matriz_a_chancado_primario["Subarea"].iloc[0]
     df_matriz_b_datos = filtrar_datos_historicos(df_matriz_a_datos,subarea)
     # ==========================================
     # GRAFICAR INSTRUMENTO 8949
@@ -61,8 +61,10 @@ async def construccion_matriz_b():#Se construye la matriz B con datos historicos
     logger.info("Envio la matriz B Construida con datos historicos")
     return df_matriz_b_datos
 
-async def metricas_matriz_b():
-    df_datos_matriz_b = await construccion_matriz_b() #Datos historicos matriz B
+async def construccion_matriz_b():
+    df_datos_matriz_b = await construccion_datos_matriz_b() #Datos historicos matriz B
     df_medidas_estadisticas = await metricas_de_matrices(df_datos_matriz_b) #Medidas estadisticas
     metrics_save(df_medidas_estadisticas)#Almacenar medidas estadisticas
-    return df_datos_matriz_b, df_medidas_estadisticas
+    info = "Se construyo la matriz B con sus medidas estadisticas y se guardaron en CSV"
+    logger.info(info)
+    return info

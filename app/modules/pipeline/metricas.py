@@ -56,7 +56,6 @@ def metrics_save(df_metricas):
     # =========================
     ids_actualizados = ids_existentes.intersection(ids_nuevos)
     ids_completamente_nuevos = ids_nuevos.difference(ids_existentes)
-    ids_no_actualizados = ids_existentes.difference(ids_nuevos)
     # =========================
     # Logs métricas actualización
     # =========================
@@ -64,7 +63,6 @@ def metrics_save(df_metricas):
     logger.info(f"Sensores recibidos en iteración: "f"{len(ids_nuevos)}")
     logger.info(f"Sensores actualizados: "f"{len(ids_actualizados)}")
     logger.info(f"Sensores nuevos agregados: "f"{len(ids_completamente_nuevos)}")
-    logger.info(f"Sensores conservados sin cambios: "f"{len(ids_no_actualizados)}")
 
     # =========================
     # Eliminar SOLO esos IDs
@@ -109,15 +107,16 @@ async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular la
         "Desviacion_Estandar": pd.Series(dtype="float"),
     })
 
-    #Trabajo n°1 añadir identificadores a cada fila de la matriz de metricas
+    #Identificador como int
     df_medidas_estadisticas["Identificador"] = (
         df_datos_matriz["Identificador"]
         .astype("Int64")
     )
     
-    #Trabajo n°2 calcular medidas estadisticas para cada instrumento
+    #solo los valores, sin la columna identificador
     valores = df_datos_matriz.drop(columns=["Identificador"])
     #================= Quality Code =============================================
+    
     # =========================
     # Obtención concurrente
     # =========================
@@ -153,11 +152,12 @@ async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular la
 
     #============ Gradiente ====================================================
     valores_sorted = valores[cols_sorted]  # Datos ordenados, sin la columna identificador
+    valores_sorted = valores_sorted.copy() #Parche para la fragmentacion
     gradiente = valores_sorted.diff(axis=1)
 
     df_gradiente = pd.DataFrame({
         "Identificador": df_datos_matriz["Identificador"],
-        "Gradiente_Promedio": gradiente.mean(axis=1, skipna=True).round(3),
+        #"Gradiente_Promedio": gradiente.mean(axis=1, skipna=True).round(3),
         "Gradiente_Max": gradiente.abs().max(axis=1, skipna=True).round(3),
         "Gradiente_Intensidad": gradiente.abs().mean(axis=1, skipna=True).round(3),
     })
@@ -167,16 +167,3 @@ async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular la
         how="left"
     )
     return df_medidas_estadisticas
-
-
-
-
-"""     for identificador in df_datos_matriz["Identificador"]: #Calculo del z_score para el ultimo valor de cada instrumento
-    desviacion_estandar = df_medidas_estadisticas.loc[df_medidas_estadisticas["Identificador"]== identificador, "Desviacion_Estandar"].values[0]
-    if abs(desviacion_estandar) < 1e-10:
-        desviacion_estandar = 0
-    media = round(df_medidas_estadisticas.loc[df_medidas_estadisticas["Identificador"]==identificador, "Media"].values[0],3)
-    #fila_medidas = df_medidas_estadisticas.loc[df_medidas_estadisticas["Identificador"]==identificador]
-    ultimo_valor = df_datos_matriz.loc[df_datos_matriz["Identificador"]==identificador].iloc[:, -1].values[0]
-    z_score = calcular_z_score(ultimo_valor, media, desviacion_estandar) #Posible envio de alerta
-    """

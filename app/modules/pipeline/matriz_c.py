@@ -1,4 +1,4 @@
-from .matriz_main_builder import obtener_historico, generar_dataframe_datos_historicos
+from .matriz_main_builder import generar_dataframe_datos_historicos, generar_dataframe_ultima_columna
 from .metricas import metricas_de_matrices
 from .data_loader import tiempo_actual
 from datetime import timedelta, datetime, timezone
@@ -36,7 +36,9 @@ async def matriz_c_builder():
     df_matriz_c_datos = await generar_dataframe_datos_historicos(df_metricas_b,fecha_inicio,fecha_fin,0,periodo_muestreo_matriz_c)
     save_data(df_matriz_c_datos)
     df_medidas_estadisticas = await metricas_de_matrices(df_matriz_c_datos)
-    return df_matriz_c_datos,df_medidas_estadisticas
+    return df_medidas_estadisticas
+
+
 def leer_datos_matriz_c_csv():
     ruta_actual = Path(__file__).resolve()
     ruta_metricas_matriz_b_csv = (
@@ -49,53 +51,93 @@ async def actualizar_ultimo_dato_c():
     df_datos_matriz_c = leer_datos_matriz_c_csv()
     df_datos_matriz_c = df_datos_matriz_c.drop(df_datos_matriz_c.columns[1], axis=1)
     fecha_fin = datetime.now(timezone.utc)
-    fecha_inicio = fecha_fin - timedelta(seconds=5)
-    periodo_muestreo_matriz_c = 50000000 #Muestreo de interpolación, cantidad de muestra por minuto (50000000 son 5 segundos)
-    ultimas_filas = await generar_dataframe_datos_historicos(df_datos_matriz_c,fecha_inicio,fecha_fin, periodo_muestreo_matriz_c)
+    fecha_inicio = fecha_fin - timedelta(seconds=10)
+    segundos_interpolacion  = 5 #Muestreo de interpolación, cantidad de muestra por minuto
+    df_ultima_columna = await generar_dataframe_ultima_columna(df_datos_matriz_c["Identificador"],fecha_inicio,fecha_fin,0,segundos_interpolacion)
     df_datos_matriz_c = df_datos_matriz_c.merge(
-    ultimas_filas,
+        df_ultima_columna,
         on="Identificador",
         how="left"
     )
     save_data(df_datos_matriz_c)
-    return "Información actualizada"
-
-def detectar_cambio_brusco(df):
-    print(df.head())
+    return df_datos_matriz_c
+async def  obtener_metricas_matriz_c():#Funcion clave que lee datos csv, actualiza ultimo dato y manda las metricas de la matriz C
+    df_datos_matriz_c = await actualizar_ultimo_dato_c()
+    df_medidas_estadisticas_matriz_c = await metricas_de_matrices(df_datos_matriz_c)
+    return df_medidas_estadisticas_matriz_c
+# =========================Criterios de alertas=========================#
+def detectar_cambio_brusco(df):#Aux
     # Evitar división por cero
     epsilon = 1e-6
     # =========================
     # Ratios
     # =========================
-    df["Ratio_STD"] = (
-        df["Desviacion_Estandar_c"]
-        /
-        (df["Desviacion_Estandar_b"] + epsilon)
-    ).round(3)
-
-    df["Ratio_Gradiente"] = ( #El promedio de variacion del instrumento
+    df["Ratio_STD"] = (df["Desviacion_Estandar_c"]/(df["Desviacion_Estandar_b"] + epsilon)).round(3)
+    #El promedio de variacion del instrumento
+    df["Ratio_Gradiente"] = (df["Gradiente_Max_c"]/(df["Gradiente_Max_b"] + epsilon)).round(3)
+    # =========================================================
+    # Clasificación de severidad
+    # =========================================================
+    df["Alerta_Cambio_Brusco"] = "NORMAL"
+    # -------------------------
+    # Preventivo
+    # -------------------------
+    df.loc[((df["Ratio_STD"] >= 2)|(df["Ratio_Gradiente"] >= 2)),"Alerta_Cambio_Brusco"] = "PREVENTIVO"
+    # -------------------------
+    # Crítico
+    # -------------------------
+    df.loc[((df["Ratio_STD"] >= 5)|(df["Ratio_Gradiente"] >= 5)),"Alerta_Cambio_Brusco"] = "CRITICO"
+    # -------------------------
+    # Emergencia
+    # -------------------------
+    df.loc[((df["Ratio_STD"] >= 10)|(df["Ratio_Gradiente"] >= 10)),"Alerta_Cambio_Brusco"] = "EMERGENCIA"
+    return df
+def detectar_oscilacion(df):#Aux
+    epsilon = 1e-6
+    # =====================================================
+    # Ratio de oscilación
+    # =====================================================
+    df["Ratio_Oscilacion"] = (
         df["Gradiente_Intensidad_c"]
         /
         (df["Gradiente_Intensidad_b"] + epsilon)
     ).round(3)
-    print(
-        df[
-            [
-                "Identificador",
-                "Ratio_STD",
-                "Ratio_Gradiente"
-            ]
-        ]
+    # =====================================================
+    # Clasificación
+    # =====================================================
+    df["Alerta_Oscilacion"] = "NORMAL"
+    # Preventivo
+    df.loc[
+        df["Ratio_Oscilacion"] >= 2,
+        "Alerta_Oscilacion"
+    ] = "PREVENTIVO"
+    # Crítico
+    df.loc[
+        df["Ratio_Oscilacion"] >= 5,
+        "Alerta_Oscilacion"
+    ] = "CRITICO"
+    # Emergencia
+    df.loc[
+        df["Ratio_Oscilacion"] >= 10,
+        "Alerta_Oscilacion"
+    ] = "EMERGENCIA"
+    return df
+def detectar_sensor_congelado(df):#Aux
+
+    df["Alerta_Senal_Congelada"] = "NORMAL"
+    condicion_congelada = (
+        (df["Desviacion_Estandar_b"] > 0.1) #No evalua sensores son ultra constantes, por lo tanto historicamente variaba
+        &
+        (df["Desviacion_Estandar_c"] <= 0.001)#std actual casi 0, lo que indica que la señal ahora está plana
+        &
+        (df["Gradiente_Intensidad_c"] <= 0.001)#gradiente actual casi 0, lo que indica que ahora no cambia entre muestras
     )
-
+    df.loc[
+        condicion_congelada,
+        "Alerta_Senal_Congelada"
+    ] = "CRITICO"
     return df
-
-def detectar_oscilacion(df):
-    return df
-def detectar_sensor_congelado(df):
-    return df
-
-def diferencia_matriz_b_matriz_c(df_matriz_b, df_matriz_c):
+def tabla_alertas(df_matriz_b, df_matriz_c):#Tabla importante de alertas que se mandan al frontend
     # Unir por identificador
     df_merge = df_matriz_b.merge(
         df_matriz_c,
@@ -103,30 +145,15 @@ def diferencia_matriz_b_matriz_c(df_matriz_b, df_matriz_c):
         suffixes=("_b", "_c")
     )
     df_merge = detectar_cambio_brusco(df_merge)
+    df_merge = detectar_oscilacion(df_merge)
+    df_merge = detectar_sensor_congelado(df_merge)
     df_merge = df_merge.replace({np.nan: None})
-    return df_merge
+    columnas_frontend = [
+        "Identificador",
+        "Alerta_Cambio_Brusco",
+        "Alerta_Oscilacion",
+        "Alerta_Senal_Congelada"
+    ]
 
-"""     # Crear dataframe resultado
-    df_diferencia = pd.DataFrame()
-    # Mantener identificador
-    df_diferencia["Identificador"] = df_merge["Identificador"]
-    # Diferencias
-    df_diferencia["Diff_Media"] = (
-        df_merge["Media_c"] - df_merge["Media_b"]
-    ).round(3)
-    df_diferencia["Diff_Desviacion"] = (
-        df_merge["Desviacion_Estandar_c"] -
-        df_merge["Desviacion_Estandar_b"]
-    ).round(3)
-    df_diferencia["Diff_Gradiente_Promedio"] = (
-        df_merge["Gradiente_Promedio_c"] -
-        df_merge["Gradiente_Promedio_b"]
-    ).round(3)
-    df_diferencia["Diff_Gradiente_Max"] = (
-        df_merge["Gradiente_Max_c"] -
-        df_merge["Gradiente_Max_b"]
-    ).round(3)
-    df_diferencia["Diff_Gradiente_Intensidad"] = (
-        df_merge["Gradiente_Intensidad_c"] -
-        df_merge["Gradiente_Intensidad_b"]
-    ).round(3) """
+    df_merge = df_merge[columnas_frontend]
+    return df_merge

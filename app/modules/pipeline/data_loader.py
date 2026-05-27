@@ -29,27 +29,6 @@ def tiempo_actual():
     now = datetime.now(timezone.utc).replace(microsecond=0)
     TIEMPO_CONGELADO = now
     return TIEMPO_CONGELADO
-""" async def datos_historicos_por_instrumento(instrumento_id, fecha_inicio, fecha_fin, periodo_muestreo):# datos historicos
-    METRIS_BASE_URI = settings.METRIS_BASE_URI
-    METRIS_TOKEN = settings.METRIS_TOKEN
-    headers = {
-        "Authorization": f"Bearer {METRIS_TOKEN}"
-    }
-    url = f"{METRIS_BASE_URI}/api/public/Historian/trendvalues"
-    params = {
-        "ID": instrumento_id,
-        "TagID": instrumento_id,
-        "Start": fecha_inicio.strftime("%Y-%m-%dT%H:%M:%SZ"),#Hora actual menos una hora en formato ISO 8601
-        "End": fecha_fin.strftime("%Y-%m-%dT%H:%M:%SZ"),#Hora actual en formato ISO 8601
-        "InterpolationMethod": 0,
-        "AggregateFunction": 1,#Cantidad de datos en el mismo json
-        "InterpolationResolutionType": 1, #Cuantos puntos yo reconstruyo la serie de tiempo original
-        "interpolationresolution": periodo_muestreo #Muestreo de interpolación, cantidad de muestra por minuto (600000000 es un minuto)
-    }
-    async with httpx.AsyncClient(verify=False) as client:
-        response = await client.get(url, headers=headers, params=params)
-    data = response.json()
-    return data """
 
 async def datos_historicos_por_instrumento(instrumento_id, fecha_inicio, fecha_fin, minutos_muestreo,segundos_muestreo):# datos historicos
     params = TrendValuesParameters(
@@ -62,10 +41,24 @@ async def datos_historicos_por_instrumento(instrumento_id, fecha_inicio, fecha_f
         interpolation_resolution_type=InterpolationResolutionType.ticks,
         aggregate_function=AggregateFunction.median
     )
-    data = hc.get_trend_values(params)
-    
+    data = hc.get_trend_values(params)    
     return data
 
+
+async def ultimo_valor_interpolado_por_instrumento(instrumento_id,fecha_inicio,fecha_fin,minutos_muestreo,segundos_muestreo):
+
+    data = await datos_historicos_por_instrumento(
+        instrumento_id,
+        fecha_inicio,
+        fecha_fin,
+        minutos_muestreo,
+        segundos_muestreo
+    )
+
+    if not data:
+        return None
+    ultimo = data[-1]
+    return ultimo
 #===================================================EXCEL Y GENERACION MATRIZ A ==========================================================
 def datos_excel_instrumentos_mapeados(): #Auxiliar de datos_matriz_a
     BASE_DIR = Path(__file__).resolve().parent.parent.parent

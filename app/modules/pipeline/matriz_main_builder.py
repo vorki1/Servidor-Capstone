@@ -1,8 +1,8 @@
-from .data_loader import datos_historicos_por_instrumento
+from .data_loader import datos_historicos_por_instrumento,ultimo_valor_interpolado_por_instrumento
 import pandas as pd
+from datetime import datetime, timezone
 import asyncio
 from app.core.logger import crear_logger
-
 logger = crear_logger("Pipeline")
 
 async def obtener_historico(identificador, fecha_inicio, fecha_fin, minutos_muestreo,segundos_muestreo):#Aux para obtener los datos historicos de cualquier instrumento
@@ -29,24 +29,17 @@ async def obtener_historico(identificador, fecha_inicio, fecha_fin, minutos_mues
             print(f"Error al obtener datos históricos para el identificador {identificador}")
         #Si no existe una fila con Y, tirara error
         logger.error(f"No hay dato historico 'Y' para: ,{identificador}: {e}")
-
 def eliminar_booleanos(df):
-
     filas_a_mantener = []
-
     for _, fila in df.iterrows():
-
         identificador = fila["Identificador"]
         # Sacar valores históricos
         # Excluir columna identificador explícitamente
         valores = fila.drop(labels=["Identificador"])
-
         # Convertir a numérico
         valores = pd.to_numeric(valores, errors="coerce")
-
         # Eliminar NaN
         valores = valores.dropna()
-
         # Redondear floats
         valores = valores.round(1)
         # Valores únicos
@@ -57,9 +50,7 @@ def eliminar_booleanos(df):
         no_eliminar = [8954,8975,9092]
         if not es_booleano or identificador in no_eliminar:
             filas_a_mantener.append(fila)
-
     return pd.DataFrame(filas_a_mantener)
-
 async def generar_dataframe_datos_historicos(df_matriz,fecha_inicio,fecha_fin, minutos_muestreo,segundos_muestreo):#Aux historicos para cualquier matriz
     #=================== Lista de identificadores==========================
     identificadores = df_matriz["Identificador"].tolist()
@@ -127,3 +118,24 @@ async def generar_dataframe_datos_historicos(df_matriz,fecha_inicio,fecha_fin, m
 
 
     return df_matriz_datos
+
+#Solo para actualizar la ultima fila del dataframe de la matriz C
+async def generar_dataframe_ultima_columna(df_identificadores,fecha_inicio,fecha_fin,minutos_muestreo,segundos_muestreo):
+    identificadores = df_identificadores.tolist()
+    timestamp_global = (datetime.now().replace(microsecond=0).astimezone().isoformat())
+    tasks = [
+        ultimo_valor_interpolado_por_instrumento(id,fecha_inicio,fecha_fin,minutos_muestreo,segundos_muestreo)
+        for id in identificadores]
+    resultados = await asyncio.gather(*tasks,return_exceptions=True)
+    registros = []
+    for id, resultado in zip(identificadores, resultados):
+        if isinstance(resultado, Exception):
+            print(f"Error en instrumento {id}: {resultado}")
+            continue
+        if resultado is None:
+            print(f"Sin datos para instrumento {id}")
+            continue
+        valor = resultado["y"]
+        registros.append({"Identificador": id,timestamp_global: valor})
+    df_ultima_columna = pd.DataFrame(registros)
+    return df_ultima_columna
