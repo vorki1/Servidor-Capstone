@@ -1,5 +1,4 @@
 from ..pipeline.pipeline_service import tabla_ultimas_alertas
-from ..criterios_de_alertas.criterios_alertas import criterios_anomalias
 import asyncio 
 from app.core.logger import crear_logger
 
@@ -9,12 +8,7 @@ async def loop_pipeline():
     while True:
         try:
             print("===== Inicio ciclo pipeline =====")
-            # 1. Actualizar matriz C
-            #await actualizar_datos_matriz_c() #String de exito
-            # 2. Comparar matrices
-            diferencias = await tabla_ultimas_alertas() #df matriz B, matriz C y diferencia
-            # 3. Detectar alertas
-            criterios_de_anomalias = criterios_anomalias(diferencias)
+            
             print("===== Fin ciclo pipeline =====")
 
         except Exception as e:

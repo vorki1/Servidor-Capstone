@@ -1,0 +1,1 @@
+from app.db.dependencies import get_db

@@ -12,7 +12,6 @@ from app.infrastructure.metrisapi.historian import (
     InterpolationResolutionType,
     ticks_from
 )
-import httpx
 #######CRITICO!!!!!!!!!!!!!!!##################################
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -60,7 +59,7 @@ async def ultimo_valor_interpolado_por_instrumento(instrumento_id,fecha_inicio,f
     ultimo = data[-1]
     return ultimo
 #===================================================EXCEL Y GENERACION MATRIZ A ==========================================================
-def datos_excel_instrumentos_mapeados(): #Auxiliar de datos_matriz_a
+""" def datos_excel_instrumentos_mapeados(): #Auxiliar de datos_matriz_a
     BASE_DIR = Path(__file__).resolve().parent.parent.parent
     EXCEL_PATH = BASE_DIR / "data" / "TagsCNN_2026-04-30_area_seca.xlsx"
     excel_instrumentos_mapeados = pd.read_excel(EXCEL_PATH)
@@ -76,6 +75,46 @@ def datos_matriz_a():#Matriz A con los datos sin identificador filtrados
     df_mapeo_instrumentos[cols_num] = df_mapeo_instrumentos[cols_num].fillna(0)
     df_mapeo_instrumentos = df_mapeo_instrumentos[df_mapeo_instrumentos["Identificador"] > 0] #Se eliminan los instrumentos con identificador 0
     return df_mapeo_instrumentos
+ """
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+EXCEL_PATH = BASE_DIR / "data" / "TagsCNN_2026-04-30_area_seca.xlsx"
+
+_df_instrumentos_mapeados = None
+_df_matriz_a = None
+
+def datos_excel_instrumentos_mapeados():
+    global _df_instrumentos_mapeados
+
+    if _df_instrumentos_mapeados is None:
+        _df_instrumentos_mapeados = pd.read_excel(EXCEL_PATH).convert_dtypes()
+
+    return _df_instrumentos_mapeados.copy()
+
+def datos_matriz_a():
+    global _df_matriz_a
+
+    if _df_matriz_a is None:
+        df_mapeo_instrumentos = datos_excel_instrumentos_mapeados()
+
+        cols_str = df_mapeo_instrumentos.select_dtypes(include=["object", "string"]).columns
+        df_mapeo_instrumentos[cols_str] = (
+            df_mapeo_instrumentos[cols_str]
+            .fillna("Vacio")
+            .apply(lambda col: col.str.strip())
+        )
+
+        cols_num = df_mapeo_instrumentos.select_dtypes(include=[np.number]).columns
+        df_mapeo_instrumentos[cols_num] = df_mapeo_instrumentos[cols_num].fillna(0)
+
+        df_mapeo_instrumentos = df_mapeo_instrumentos[
+            df_mapeo_instrumentos["Identificador"] > 0
+        ]
+
+        _df_matriz_a = df_mapeo_instrumentos
+
+    return _df_matriz_a.copy()
+#===================================================EXCEL Y GENERACION MATRIZ A ==========================================================
 
 def subarea_chancado_primario():
     df_general_a = datos_matriz_a()
