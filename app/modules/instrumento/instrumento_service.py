@@ -27,9 +27,16 @@ def historico_instrumento():#Para datos si necesita el Gilbert, sino para la cas
 
 async def areas_unicas():#A visualizador
     df_response = datos_matriz_a()
-    areas_unicas = df_response["Area"].unique().tolist()
+    #areas_unicas = df_response["Area"].unique().tolist()
+    areas = (
+        df_response["Area"]
+        .dropna()
+        .loc[lambda x: x != 0]
+        .unique()
+        .tolist()
+    ) 
     data ={
-        "areas":areas_unicas
+        "areas":areas
     }
     return data
 async def subareas_de_area(area):#A visualizador
@@ -41,25 +48,44 @@ async def subareas_de_area(area):#A visualizador
         "subareas":subareas
     }
     return data
-async def instrumentos_por_subarea(subarea):#A visualizador
-    df_response = datos_matriz_a()
-    df_instrumentos = df_response[df_response["Subarea"]==subarea]
-    area = df_instrumentos["Area"].unique()
-    obs = ""
-    if len(area) > 1:
-        obs = "Estan las siguientes areas asociadas a este instrumento", area
-    else:
-        obs = "Todo en orden"
-        area = int(area[0])
-    data = {
-        "obs":obs,
-        "area":area,
-        "subarea":subarea,
-        "instrumentos":df_instrumentos.to_dict(orient='records')
-    }
-    return data
-async def instrumentos_por_sistema(sistema):#A visualizador °°°°°°°°°°°°Falta por ver°°°°°°°°°°°°°°°°°°°°°°°°°
-    return
+async def sistemas_por_subarea(subarea):
+    df = datos_matriz_a()
+
+    sistemas = (
+        df[df["Subarea"] == subarea]["Sistema"]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+    print(
+    df[
+        ["Subarea", "Sistema"]
+    ].drop_duplicates()
+)
+
+    return sistemas
+async def instrumentos_por_sistema(
+    sistema
+):
+    df = datos_matriz_a()
+
+    instrumentos = df[
+        df["Sistema"] == sistema
+    ]
+
+    return instrumentos.to_dict(
+        orient="records"
+    )
+async def instrumentos_por_sistema(sistema):
+    df = datos_matriz_a()
+
+    instrumentos = df[
+        df["Sistema"] == sistema
+    ]
+
+    return instrumentos.to_dict(orient="records")
+
+
 async def informacion_instrumento(id):#A visualizador info del sensor y metricas
     df_response = datos_matriz_a()
     datos_instrumento = df_response[df_response["Identificador"] == id]

@@ -28,7 +28,7 @@ async def construccion_datos_matriz_b():#Se construye la matriz B con datos hist
     # GRAFICAR INSTRUMENTO 8949
     # ==========================================
 
-    """ fila_8949 = df_matriz_b_datos[
+    fila_8949 = df_matriz_b_datos[
         df_matriz_b_datos["Identificador"] == 8949
     ].iloc[0]
 
@@ -57,7 +57,7 @@ async def construccion_datos_matriz_b():#Se construye la matriz B con datos hist
     plt.ylabel("Valor")
     plt.grid(True)
 
-    plt.show() """
+    plt.show()
     logger.info("Envio la matriz B Construida con datos historicos")
     return df_matriz_b_datos
 
