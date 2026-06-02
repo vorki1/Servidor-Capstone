@@ -25,11 +25,10 @@ async def obtener_sistemas(subarea: str):
     return await sistemas_por_subarea(subarea)
 @router.get("/sistemas/{sistema}/instrumentos")
 async def obtener_instrumentos_de_sistema(sistema: str):
-    
     return await instrumentos_por_sistema(sistema)
-@router.get("/info-instrumento")
+@router.get("/{id}")
 async def info_instrumento(id:int):
     return await informacion_instrumento(id)
-@router.get("/histogram")#Endpoint del historial de tiempo de un instrumento
+@router.get("/{id}/historico")#Endpoint del historial de tiempo de un instrumento
 async def datos_historicos_por_instrumento(id:int,minutos:int):
     return await datos_historicos_por_id(id,minutos)

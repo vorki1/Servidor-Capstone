@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from .modules.instrumento.instrumento_router import router as instrumento_router
 from .modules.pipeline.pipeline_router import router as pipeline_router
+from .modules.alertas.alerta_router import router as alerta_router
 from .modules.loop_pipeline.loop_matrices import loop_pipeline
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.init_db import create_tables
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(instrumento_router)
 app.include_router(pipeline_router)
+app.include_router(alerta_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

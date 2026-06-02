@@ -64,18 +64,6 @@ async def sistemas_por_subarea(subarea):
 )
 
     return sistemas
-async def instrumentos_por_sistema(
-    sistema
-):
-    df = datos_matriz_a()
-
-    instrumentos = df[
-        df["Sistema"] == sistema
-    ]
-
-    return instrumentos.to_dict(
-        orient="records"
-    )
 async def instrumentos_por_sistema(sistema):
     df = datos_matriz_a()
 
@@ -85,20 +73,29 @@ async def instrumentos_por_sistema(sistema):
 
     return instrumentos.to_dict(orient="records")
 
-
 async def informacion_instrumento(id):#A visualizador info del sensor y metricas
     df_response = datos_matriz_a()
     datos_instrumento = df_response[df_response["Identificador"] == id]
-    df_metricas_matriz_b = leer_metricas_matriz_b()
-    datos_metricas_instrumento = df_metricas_matriz_b[df_metricas_matriz_b["Identificador"] == id]
     data = {
         "informacion_general": datos_instrumento.to_dict(orient='records'),
-        "metricas_instrumento":datos_metricas_instrumento.to_dict(orient='records')
     }
     return data
 async def datos_historicos_por_id(id,minutos):#A visualizador
     fecha_fin = tiempo_actual()
     fecha_inicio = fecha_fin - timedelta(minutes=minutos)
-    periodo_muestreo_matriz_c = 50000000 #Muestreo de interpolación, cantidad de muestra por minuto (50000000 son 5 segundos)
-    data = await datos_historicos_por_instrumento(id,fecha_inicio,fecha_fin, periodo_muestreo_matriz_c)
-    return {"Datos historicos":data}
+    minutos_muestreo = 0
+    segundos_muestreo = 0
+    
+    if minutos < 60:
+        minutos_muestreo = 0
+        segundos_muestreo = 30
+        data = await datos_historicos_por_instrumento(id,fecha_inicio,fecha_fin, minutos_muestreo=minutos_muestreo,segundos_muestreo=segundos_muestreo)
+        return data
+    elif minutos >= 60 and minutos <= 720:
+        minutos_muestreo = 1
+        segundos_muestreo = 0
+        data = await datos_historicos_por_instrumento(id,fecha_inicio,fecha_fin, minutos_muestreo=minutos_muestreo,segundos_muestreo=segundos_muestreo)
+        return data
+    elif minutos <= 0:
+        return {"error": "El número de minutos debe ser mayor que cero."}
+    return {"error": "Intervalo de minutos no válido."}

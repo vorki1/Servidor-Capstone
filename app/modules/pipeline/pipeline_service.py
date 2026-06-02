@@ -16,6 +16,5 @@ async def tabla_ultimas_alertas(): #Diferencia para analizar matriz B y matriz C
     metricas_matriz_b = leer_metricas_matriz_b()#Leemos CSV con medidas estadisticas y genera el DataFrame
     metricas_matriz_c = await obtener_metricas_matriz_c()#Obtenemos las metricas de la matriz C, con el ultimo dato actualizado
     df_tabla_alertas = tabla_alertas(metricas_matriz_b,metricas_matriz_c)
-    print(df_tabla_alertas)
     df_tabla_alertas = datos_y_alertas_instrumentos(df_tabla_alertas)
     return df_tabla_alertas.to_dict(orient="records")
