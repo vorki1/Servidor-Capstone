@@ -14,7 +14,12 @@ async def obtener_historico(identificador, fecha_inicio, fecha_fin, minutos_mues
             minutos_muestreo,
             segundos_muestreo
         )
+        #print(f"Datos históricos para el identificador {identificador}:\n", data[:3])
         if identificador == 8954:
+            #print(f"Datos históricos para el identificador {identificador}:\n", data[:10])
+            #print(json.dumps(data[:3], indent=2))
+            pass
+        if identificador == 8955:
             #print(f"Datos históricos para el identificador {identificador}:\n", data[:10])
             #print(json.dumps(data[:3], indent=2))
             pass
@@ -47,7 +52,8 @@ def eliminar_booleanos(df):
         #print(f"Valores únicos para el identificador {identificador}: {list(valores_unicos)[:5]}")
         # Detectar booleanos
         es_booleano = valores_unicos.issubset({0.0, 1.0,-1.0})
-        no_eliminar = [8954,8975,9092]
+        #-------------Chancado primario-Chancado secundario:8955-Chancado Terciario:8956,9016-Chancado cuaternario 22180,9017
+        no_eliminar = [8954,8975,9092,8955,22258,9016,22180,9017]
         if not es_booleano or identificador in no_eliminar:
             filas_a_mantener.append(fila)
     return pd.DataFrame(filas_a_mantener)

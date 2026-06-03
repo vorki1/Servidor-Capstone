@@ -9,20 +9,20 @@
         {"WQIT-32149":"SERVER_OSS01M::WQIT-32149/AI_DP.PV_Out#Value"}
     ],
     "Chancado Secundario":[
-        {"CR-02":"SERVER_OSS01M::32000_CR_0002_MO/M2.RunSig#Value"},
-        {"CV-02":"SERVER_OSS01M::3200_CV_0002_MO/M4.RunSig#Value"},
-        {"FE-02":"SERVER_OSS01M::3200_FE_0002/M3.RunSig#Value"},
+        {"CR-02:8955":"SERVER_OSS01M::32000_CR_0002_MO/M2.RunSig#Value"},
+        {"CV-02:8980":"SERVER_OSS01M::3200_CV_0002_MO/M4.RunSig#Value"},
+        {"FE-02:9009":"SERVER_OSS01M::3200_FE_0002/M3.RunSig#Value"},
         {"FE-03":"SERVER_OSS01M::3200_FE_0003/M3.RunSig#Value"},
         {"FE-04":"SERVER_OSS01M::3200_FE_0004/M3.RunSig#Value"},
         {"FE-05":"SERVER_OSS01M::3200_FE_0005/M3.RunSig#Value"},
-        {"WIQT-32207":"SERVER_OSS01M::WIQT_32207/AI_DP.PV_Out#Value"}
+        {"WIQT-32207:9599":"SERVER_OSS01M::WIQT_32207/AI_DP.PV_Out#Value"}
     ],
     "Chancado Terciario":[
-        {"Guillotina PP-01":"SERVER_OSS01M::Vendor_KHD/Prensa_Rodillos.Q_DB40_DBX23_6"},
+        {"Guillotina PP-01:22258":"SERVER_OSS01M::Vendor_KHD/Prensa_Rodillos.Q_DB40_DBX23_6"},
         {"CV-03":"SERVER_OSS01M::3200_CV_0003_MO/M3.RunSig#Value"},
         {"CV-04":"SERVER_OSS01M::3200_CV_0004_MO/M1.RunSig#Value"},
         {"FE-09":"SERVER_OSS01M::3200_FE_0009/M3.RunSig#Value"},
-        {"WIT-32368":"SERVER_OSS01M::WI_32368/AI_DP.PV_Out#Value"}
+        {"WIT-32368 CV-04:6265":"SERVER_OSS01M::WI_32368/AI_DP.PV_Out#Value"}
     ],
     "Chancado Cuaternario":[
         {"PP-02":"SERVER_OSS01M::Vendor_KHD_PP002/KHD_Cuaternario.Q_DB40_DBX23_6"},
@@ -37,7 +37,7 @@
         {"FE-13":"SERVER_OSS01M::3200_FE_0013_MO/M3.RunSig#Value"},
         {"FE-14":"SERVER_OSS01M::3200_FE_0014_MO/M3.RunSig#Value"},
         {"FE-15":"SERVER_OSS01M::3200_FE_0015_MO/M3.RunSig#Value"},
-        {"FE-16":"SERVER_OSS01M::3200_FE_0016_MO/M3.RunSig#Value"},
+        {"FE-16:9017":"SERVER_OSS01M::3200_FE_0016_MO/M3.RunSig#Value"},
         {"SN-02":"SERVER_OSS01M::3200_SN_0002_MO/M1.RunSig#Value"},
         {"SN-03":"SERVER_OSS01M::3200_SN_0003_MO/M1.RunSig#Value"},
         {"SN-04":"SERVER_OSS01M::3200_SN_0004_MO/M1.RunSig#Value"},

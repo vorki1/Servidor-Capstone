@@ -1,4 +1,10 @@
 import numpy as np
+from app.modules.alertas.alerta_service import procesar_alertas_dataframe
+from app.modules.alertas.alerta_repository import obtener_activas
+from ..pipeline.data_loader import datos_matriz_a
+from app.db.database import SessionLocal
+import pandas as pd
+
 # =========================Criterios de alertas=========================#
 def detectar_cambio_brusco(df):#Aux
     # Evitar división por cero
@@ -91,3 +97,107 @@ def tabla_alertas(df_matriz_b, df_matriz_c):#Tabla importante de alertas que se 
 
     df_merge = df_merge[columnas_frontend]
     return df_merge
+
+def datos_y_alertas_instrumentos(df_tabla_alertas):
+    df_info_instrumentos = datos_matriz_a()
+
+    columnas_info = [
+        "Identificador",
+        "Nombre_TAG",
+        "Descripcion",
+        "Unidad_de_Ingenieria",
+        "Area",
+        "Subarea",
+        "Sistema",
+    ]
+
+    df_info_instrumentos = df_info_instrumentos[columnas_info]
+
+    df_tabla_alertas_enriquecida = df_tabla_alertas.merge(
+        df_info_instrumentos,
+        on="Identificador",
+        how="left"
+    )
+
+    columnas_alertas = [
+        "Alerta_Cambio_Brusco",
+        "Alerta_Oscilacion",
+        "Alerta_Senal_Congelada",
+    ]
+
+    df_tabla_alertas_enriquecida[columnas_alertas] = (
+        df_tabla_alertas_enriquecida[columnas_alertas]
+        .astype(str)
+        .apply(lambda col: col.str.strip().str.upper())
+    )
+
+    df_tabla_alertas_enriquecida = df_tabla_alertas_enriquecida[
+        (
+            df_tabla_alertas_enriquecida["Alerta_Cambio_Brusco"] != "NORMAL"
+        )
+        |
+        (
+            df_tabla_alertas_enriquecida["Alerta_Oscilacion"] != "NORMAL"
+        )
+        |
+        (
+            df_tabla_alertas_enriquecida["Alerta_Senal_Congelada"] != "NORMAL"
+        )
+    ]
+
+    db = SessionLocal()
+
+    try:
+        procesar_alertas_dataframe(db, df_tabla_alertas_enriquecida)
+
+        alertas_activas = obtener_activas(db)
+
+        data_alertas = []
+
+        for alerta in alertas_activas:
+            data_alertas.append({
+                "Identificador": alerta.identificador,
+                "Area": alerta.area,
+                "Subarea": alerta.subarea,
+                "Sistema": alerta.sistema,
+                "Tipo_Alerta_DB": alerta.tipo_alerta,
+                "Nivel_Alerta_DB": alerta.nivel_alerta,
+                "Fecha_Inicio_Alarma": alerta.fecha_inicio,
+                "Fecha_Ultima_Actualizacion": alerta.fecha_ultima_actualizacion,
+                "Fecha_Fin": alerta.fecha_fin,
+                "Ciclos_Alarma": alerta.ciclos,
+                "Alarma_Activa": alerta.activa,
+            })
+
+        df_alertas_db = pd.DataFrame(data_alertas)
+
+        if not df_alertas_db.empty:
+            df_tabla_alertas_enriquecida = df_info_instrumentos.merge(
+                df_alertas_db,
+                on="Identificador",
+                how="inner"
+            )
+
+    finally:
+        db.close()
+    df_tabla_alertas_enriquecida = df_tabla_alertas_enriquecida.drop(
+        columns=[
+            "Alerta_Cambio_Brusco",
+            "Alerta_Oscilacion",
+            "Alerta_Senal_Congelada",
+        ],
+        errors="ignore"
+    )
+
+    df_tabla_alertas_enriquecida = df_tabla_alertas_enriquecida.rename(
+        columns={
+            "Tipo_Alerta_DB": "Tipo_Alerta",
+            "Nivel_Alerta_DB": "Nivel_Alerta",
+        }
+    )
+    df_tabla_alertas_enriquecida = (
+        df_tabla_alertas_enriquecida
+        .replace({np.nan: None})
+    )
+
+    return df_tabla_alertas_enriquecida

@@ -1,11 +1,12 @@
 from ..pipeline.matriz_b import construccion_matriz_b
-from ..pipeline.matriz_c import matriz_c_builder, leer_metricas_matriz_b,obtener_metricas_matriz_c,datos_y_alertas_instrumentos
-from ..alertas.criterios_alertas import tabla_alertas
+from ..pipeline.matriz_c import matriz_c_builder, leer_metricas_matriz_b,obtener_metricas_matriz_c
+from ..alertas.criterios_alertas import tabla_alertas,datos_y_alertas_instrumentos
 import numpy as np
 
 
 async def matriz_b():#Matriz B, historico, metricas y metricas en CSV
     info = await construccion_matriz_b()
+    await matriz_datos_c()
     return { "message": info }
 async def matriz_datos_c():#Metricas de matriz C
     df_medidas_estadisticas = await matriz_c_builder() #data frame de datos historicos matriz C

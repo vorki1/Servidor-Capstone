@@ -71,9 +71,15 @@ def metrics_save(df_metricas):
     # =========================
     # Concatenar datos nuevos
     # =========================
-    df_final = pd.concat([df_existente, df_metricas],ignore_index=True)
-    logger.info(f"Total sensores finales: "f"{len(df_final)}")
+    df_final = pd.concat([df_existente, df_metricas], ignore_index=True)
+
+    logger.info(f"Total sensores finales: {len(df_final)}")
+
+    df_final.to_csv(ruta_csv, index=False)
+
+    logger.info("CSV actualizado correctamente")
     # =========================
+    
     return
 def redondeo_arriba_abs(x):#Aux para redondear el z-score
     return math.ceil(x * 100) / 100

@@ -4,7 +4,6 @@ from .data_loader import (
     subarea_chancado_secundario,
     subarea_chancado_terciario,
     subarea_chancado_cuaternario,
-    subarea_molienda_cuaternaria,
     subarea_acopio_fino
 )
 import matplotlib.pyplot as plt
@@ -18,18 +17,17 @@ logger = crear_logger("Pipeline")
 
 async def construccion_datos_matriz_b():#Se construye la matriz B con datos historicos
     fecha_fin = tiempo_actual()
-    fecha_inicio = fecha_fin - relativedelta(days=2)
+    fecha_inicio = fecha_fin - relativedelta(days=3)
     periodo_muestreo_matriz_b = 1 #Muestreo de interpolación, cantidad de muestra por minuto (600000000 es un minuto)
-    df_matriz_a_chancado_primario = subarea_chancado_primario() #Entrega un DF
+    df_matriz_a_chancado_primario = subarea_chancado_cuaternario() #Entrega un DF
     df_matriz_a_datos = await generar_dataframe_datos_historicos(df_matriz_a_chancado_primario, fecha_inicio, fecha_fin, periodo_muestreo_matriz_b,segundos_muestreo=0)
     subarea = df_matriz_a_chancado_primario["Subarea"].iloc[0]
     df_matriz_b_datos = filtrar_datos_historicos(df_matriz_a_datos,subarea)
     # ==========================================
-    # GRAFICAR INSTRUMENTO 8949
+    # GRAFICAR INSTRUMENTO Corriente CR-01:8949, CR-02:8950, PP-01 corriente del fijo 9049, PP-02 corriente del fijo 9053
     # ==========================================
-
     fila_8949 = df_matriz_b_datos[
-        df_matriz_b_datos["Identificador"] == 8949
+        df_matriz_b_datos["Identificador"] == 9053
     ].iloc[0]
 
     # Quitar identificador
@@ -52,12 +50,13 @@ async def construccion_datos_matriz_b():#Se construye la matriz B con datos hist
         serie_8949.values
     )
 
-    plt.title("Instrumento 8949")
+    plt.title("Instrumento 9053")
     plt.xlabel("Timestamp")
     plt.ylabel("Valor")
     plt.grid(True)
 
     plt.show()
+
     logger.info("Envio la matriz B Construida con datos historicos")
     return df_matriz_b_datos
 
