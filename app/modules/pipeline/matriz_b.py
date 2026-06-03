@@ -17,16 +17,16 @@ logger = crear_logger("Pipeline")
 
 async def construccion_datos_matriz_b():#Se construye la matriz B con datos historicos
     fecha_fin = tiempo_actual()
-    fecha_inicio = fecha_fin - relativedelta(days=3)
+    fecha_inicio = fecha_fin - relativedelta(days=10)
     periodo_muestreo_matriz_b = 1 #Muestreo de interpolación, cantidad de muestra por minuto (600000000 es un minuto)
-    df_matriz_a_chancado_primario = subarea_chancado_cuaternario() #Entrega un DF
+    df_matriz_a_chancado_primario = subarea_acopio_fino() #Entrega un DF
     df_matriz_a_datos = await generar_dataframe_datos_historicos(df_matriz_a_chancado_primario, fecha_inicio, fecha_fin, periodo_muestreo_matriz_b,segundos_muestreo=0)
     subarea = df_matriz_a_chancado_primario["Subarea"].iloc[0]
     df_matriz_b_datos = filtrar_datos_historicos(df_matriz_a_datos,subarea)
     # ==========================================
     # GRAFICAR INSTRUMENTO Corriente CR-01:8949, CR-02:8950, PP-01 corriente del fijo 9049, PP-02 corriente del fijo 9053
     # ==========================================
-    fila_8949 = df_matriz_b_datos[
+    """ fila_8949 = df_matriz_b_datos[
         df_matriz_b_datos["Identificador"] == 9053
     ].iloc[0]
 
@@ -55,7 +55,7 @@ async def construccion_datos_matriz_b():#Se construye la matriz B con datos hist
     plt.ylabel("Valor")
     plt.grid(True)
 
-    plt.show()
+    plt.show() """
 
     logger.info("Envio la matriz B Construida con datos historicos")
     return df_matriz_b_datos
@@ -64,6 +64,6 @@ async def construccion_matriz_b():
     df_datos_matriz_b = await construccion_datos_matriz_b() #Datos historicos matriz B
     df_medidas_estadisticas = await metricas_de_matrices(df_datos_matriz_b) #Medidas estadisticas
     metrics_save(df_medidas_estadisticas)#Almacenar medidas estadisticas
-    info = "Se construyo la matriz B con sus medidas estadisticas y se guardaron en CSV"
+    info = "Se construyo la matriz B con sus medidas estadisticas y la matriz C con los datos historicos. Ambos se guardaron en CSV"
     logger.info(info)
     return info

@@ -47,10 +47,12 @@
         {"WIT-32878":"SERVER_OSS01M::WI_32878/AI_DP.PV_Out#Value"}
     ],
     "Acopio Fino":[
-        {"CV-12":"SERVER_OSS01M::3300_CV_0012/M3.RunSig#Value"},
-        {"CV-13":"SERVER_OSS01M::3200_CV_0013_MO/M1.RunSig#Value"},
-        {"CV-14":"SERVER_OSS01M::3300_CV_0014/M3.RunSig#Value"},
-        {"CV-15":"SERVER_OSS01M::3300_CV_0015_VDF/M4.RunSig#Value"},
+        {"CV-12:8986":"SERVER_OSS01M::3300_CV_0012/M3.RunSig#Value"},
+        {"WIT-32879 CV-12:9242":"SERVER_OSS01M::WI_32893/AI_DP.PV_Out#Value"},
+        {"CV-13:5756":"SERVER_OSS01M::3200_CV_0013_MO/M1.RunSig#Value"},
+        {"CV-14:9144":"SERVER_OSS01M::3300_CV_0014/M3.RunSig#Value"},
+        {"CV-15:9145":"SERVER_OSS01M::3300_CV_0015_VDF/M4.RunSig#Value"},
+        {"WIT-32879 CV-12:4569":"SERVER_OSS01M::WI-33138/AI_DP.PV_Out#Value"},
         {"FE-17":"SERVER_OSS01M::3300_FE_0017(2)/M3.RunSig#Value"},
         {"FE-18":"SERVER_OSS01M::3300_FE_0018(2)/M3.RunSig#Value"},
         {"FE-19":"SERVER_OSS01M::3300_FE_0019(2)/M3.RunSig#Value"},
@@ -78,7 +80,7 @@
         {"FE-41":"SERVER_OSS01M::3300_FE_0041/M3.RunSig#Value"},
         {"FE-42":"SERVER_OSS01M::3300_FE_0042/M3.RunSig#Value"},
         {"FE-43":"SERVER_OSS01M::3300_FE_0043/M3.RunSig#Value"},
-        {"TR-01":"SERVER_OSS01M::3200_TR_0001_MO01/M1.RunSig#Value"},
-        {"SK-01":""}
+        {"TR-01:5754":"SERVER_OSS01M::3200_TR_0001_MO01/M1.RunSig#Value"},
+        {"SK-01:9066":"SERVER_OSS01M::Apilador_Data_1/AlarmByte20.Out8#Value"}
     ]
 }

@@ -1,7 +1,7 @@
 # app/modules/alertas/alerta_model.py
 
 from datetime import datetime, timezone
-from sqlalchemy import Integer, String, Boolean, DateTime, UniqueConstraint
+from sqlalchemy import Integer, String, Boolean, DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -10,41 +10,95 @@ from app.db.database import Base
 class AlertaInstrumento(Base):
     __tablename__ = "alertas_instrumentos"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+        index=True
+    )
 
-    identificador: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
-    
-    tipo_alerta: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    identificador: Mapped[int] = mapped_column(
+        Integer,
+        index=True,
+        nullable=False
+    )
 
-    nivel_alerta: Mapped[str] = mapped_column(String(50), nullable=False)
+    tipo_alerta: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        index=True
+    )
 
-    nombre_tag: Mapped[str] = mapped_column(String(255), nullable=True)
+    nivel_alerta: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False
+    )
 
-    descripcion: Mapped[str] = mapped_column(String(500), nullable=True)
+    nombre_tag: Mapped[str] = mapped_column(
+        String(255),
+        nullable=True
+    )
 
-    unidad_de_ingenieria: Mapped[str] = mapped_column(String(100), nullable=True)
+    descripcion: Mapped[str] = mapped_column(
+        String(500),
+        nullable=True
+    )
 
-    area: Mapped[str] = mapped_column(String(100),nullable=True)
+    unidad_de_ingenieria: Mapped[str] = mapped_column(
+        String(100),
+        nullable=True
+    )
 
-    subarea: Mapped[str] = mapped_column(String(100),nullable=True)
+    area: Mapped[str] = mapped_column(
+        String(100),
+        nullable=True
+    )
 
-    sistema: Mapped[str] = mapped_column(String(100),nullable=True)
+    subarea: Mapped[str] = mapped_column(
+        String(100),
+        nullable=True
+    )
 
-    fecha_inicio: Mapped[datetime] = mapped_column(DateTime,default=lambda: datetime.now(timezone.utc),nullable=False)
+    sistema: Mapped[str] = mapped_column(
+        String(100),
+        nullable=True
+    )
 
-    fecha_ultima_actualizacion: Mapped[datetime] = mapped_column(DateTime,default=lambda: datetime.now(timezone.utc),nullable=False)
+    fecha_inicio: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
 
-    fecha_fin: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    fecha_ultima_actualizacion: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
 
-    ciclos: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    fecha_fin: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
 
-    activa: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    ciclos: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        nullable=False
+    )
+
+    activa: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False
+    )
 
     __table_args__ = (
-        UniqueConstraint(
+        Index(
+            "uq_alerta_activa_por_tipo",
             "identificador",
             "tipo_alerta",
-            "activa",
-            name="uq_alerta_activa_por_tipo"
+            unique=True,
+            postgresql_where=(activa == True)
         ),
     )

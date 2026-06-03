@@ -151,18 +151,41 @@ def filtrar_chancado_cuaternario(df_historico):
             )
 
             df_historico.loc[mascara, timestamp] = np.nan
-            print(
-                df_historico[
-                    ["Identificador", timestamp]
-                ]
-            )
     return df_historico
 
 def filtrar_acopio_fino(df_historico):
     print("Soy acopio fino")
 
-    # Pendiente lógica operacional
+    fila_8986 = df_historico[
+        df_historico["Identificador"] == 8986
+    ].iloc[0]
 
+    fila_9145 = df_historico[
+        df_historico["Identificador"] == 9145
+    ].iloc[0]
+
+    control_8986 = fila_8986.drop(labels=["Identificador"])
+    control_9145 = fila_9145.drop(labels=["Identificador"])
+
+    for timestamp in control_8986.index:
+
+        valor_8986 = control_8986[timestamp]
+        valor_9145 = control_9145[timestamp]
+
+        # Si CV-12 y CV-15 están apagados,
+        # todo Acopio Fino queda apagado
+        if valor_8986 != 1 and valor_9145 != 1:
+            print(valor_8986, valor_9145)
+            mascara = ~df_historico["Identificador"].isin(
+                [8986, 9145]
+            )
+
+            df_historico.loc[mascara, timestamp] = np.nan
+            print(
+                df_historico[
+                    ["Identificador", timestamp]
+                ]
+            )
     return df_historico
 
 ACCIONES_SUBAREA = {
