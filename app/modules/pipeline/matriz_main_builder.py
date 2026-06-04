@@ -54,7 +54,13 @@ def eliminar_booleanos(df):
         es_booleano = valores_unicos.issubset({0.0, 1.0,-1.0})
         #-------------Chancado primario-Chancado secundario:8955-Chancado Terciario:8956,9016-Chancado cuaternario 22180,9017
         #-------------Acopio fino:8986,9145
-        no_eliminar = [8954,8975,9092,8955,22258,9016,22180,9017,8986,9145]
+        no_eliminar = [
+            8954, 8975, 9092,
+            8955,
+            22258, 9016,
+            22180, 9017,
+            8986, 5756, 5754, 9066, 9144, 9145
+        ]
         if not es_booleano or identificador in no_eliminar:
             filas_a_mantener.append(fila)
     return pd.DataFrame(filas_a_mantener)

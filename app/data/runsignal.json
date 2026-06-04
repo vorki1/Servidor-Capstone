@@ -52,7 +52,7 @@
         {"CV-13:5756":"SERVER_OSS01M::3200_CV_0013_MO/M1.RunSig#Value"},
         {"CV-14:9144":"SERVER_OSS01M::3300_CV_0014/M3.RunSig#Value"},
         {"CV-15:9145":"SERVER_OSS01M::3300_CV_0015_VDF/M4.RunSig#Value"},
-        {"WIT-32879 CV-12:4569":"SERVER_OSS01M::WI-33138/AI_DP.PV_Out#Value"},
+        {"WIT-32879 CV-15:4569":"SERVER_OSS01M::WI-33138/AI_DP.PV_Out#Value"},
         {"FE-17":"SERVER_OSS01M::3300_FE_0017(2)/M3.RunSig#Value"},
         {"FE-18":"SERVER_OSS01M::3300_FE_0018(2)/M3.RunSig#Value"},
         {"FE-19":"SERVER_OSS01M::3300_FE_0019(2)/M3.RunSig#Value"},

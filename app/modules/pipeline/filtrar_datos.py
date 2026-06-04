@@ -1,6 +1,7 @@
 from app.core.logger import crear_logger
 import pandas as pd
 import numpy as np
+from .data_loader import datos_matriz_a
 
 logger = crear_logger("Pipeline")
 
@@ -156,36 +157,157 @@ def filtrar_chancado_cuaternario(df_historico):
 def filtrar_acopio_fino(df_historico):
     print("Soy acopio fino")
 
+    df_info = datos_matriz_a()
+
+    df_info = df_info[
+        df_info["Subarea"] == "Acopio Fino"
+    ][["Identificador", "Sistema"]]
+
+    df_historico = df_historico.merge(
+        df_info,
+        on="Identificador",
+        how="left"
+    )
+
     fila_8986 = df_historico[
         df_historico["Identificador"] == 8986
-    ].iloc[0]
+    ].iloc[0]  # CV-12
+
+    fila_9242 = df_historico[
+        df_historico["Identificador"] == 9242
+    ].iloc[0]  # Tonelaje CV-12
+
+    fila_5756 = df_historico[
+        df_historico["Identificador"] == 5756
+    ].iloc[0]  # CV-13
+
+    fila_5754 = df_historico[
+        df_historico["Identificador"] == 5754
+    ].iloc[0]  # TR-01
+
+    fila_9066 = df_historico[
+        df_historico["Identificador"] == 9066
+    ].iloc[0]  # SK-01
+
+    fila_9144 = df_historico[
+        df_historico["Identificador"] == 9144
+    ].iloc[0]  # CV-14
 
     fila_9145 = df_historico[
         df_historico["Identificador"] == 9145
-    ].iloc[0]
+    ].iloc[0]  # CV-15
 
-    control_8986 = fila_8986.drop(labels=["Identificador"])
-    control_9145 = fila_9145.drop(labels=["Identificador"])
+    fila_4569 = df_historico[
+        df_historico["Identificador"] == 4569
+    ].iloc[0]  # Tonelaje CV-15
 
+    control_8986 = fila_8986.drop(labels=["Identificador", "Sistema"])
+    control_9242 = fila_9242.drop(labels=["Identificador", "Sistema"])
+    control_5756 = fila_5756.drop(labels=["Identificador", "Sistema"])
+    control_5754 = fila_5754.drop(labels=["Identificador", "Sistema"])
+    control_9066 = fila_9066.drop(labels=["Identificador", "Sistema"])
+    control_9144 = fila_9144.drop(labels=["Identificador", "Sistema"])
+    control_9145 = fila_9145.drop(labels=["Identificador", "Sistema"])
+    control_4569 = fila_4569.drop(labels=["Identificador", "Sistema"])
+
+    cv14_valor_anterior = 0
+    cv14_iteraciones_arranque = 0
+    cv14_iteraciones_parada = 0
+
+    ventana_arranque_cv14 = 40
+    ventana_parada_cv14 = 5
     for timestamp in control_8986.index:
 
         valor_8986 = control_8986[timestamp]
+        valor_9242 = control_9242[timestamp]
+        valor_5756 = control_5756[timestamp]
+        valor_5754 = control_5754[timestamp]
+        valor_9066 = control_9066[timestamp]
+        valor_9144 = control_9144[timestamp]
         valor_9145 = control_9145[timestamp]
+        valor_4569 = control_4569[timestamp]
 
-        # Si CV-12 y CV-15 están apagados,
-        # todo Acopio Fino queda apagado
-        if valor_8986 != 1 and valor_9145 != 1:
-            print(valor_8986, valor_9145)
-            mascara = ~df_historico["Identificador"].isin(
-                [8986, 9145]
+        cv12_operando = (
+            valor_8986 == 1
+            and valor_9242 > 500
+        )
+
+        cv13_operando = (
+            cv12_operando
+            and valor_5756 == 1
+        )
+
+        tr01_operando = (
+            cv12_operando
+            and valor_5754 == 1
+        )
+
+        sk01_operando = (
+            tr01_operando
+            and valor_9066 == 1
+        )
+
+        cv14_operando = (
+            valor_9144 == 1
+        )
+
+        cv15_operando = (
+            valor_9145 == 1
+            and valor_4569 > 950
+            and (
+                cv13_operando
+                or cv14_operando
             )
-
+        )
+        if not cv12_operando:
+            mascara = df_historico["Sistema"].isin(["CV_12"])
             df_historico.loc[mascara, timestamp] = np.nan
-            print(
-                df_historico[
-                    ["Identificador", timestamp]
-                ]
-            )
+            
+
+        if not cv13_operando:
+            mascara = df_historico["Sistema"].isin(["CV_13"])
+            df_historico.loc[mascara, timestamp] = np.nan
+
+        if not tr01_operando:
+            mascara = df_historico["Sistema"].isin(["TR_01"])
+            df_historico.loc[mascara, timestamp] = np.nan
+
+        if not sk01_operando:
+            mascara = df_historico["Sistema"].isin(["SK_01"])
+            df_historico.loc[mascara, timestamp] = np.nan
+
+
+        # Detectar arranque
+        if cv14_valor_anterior != 1 and valor_9144 == 1:
+            cv14_iteraciones_arranque = ventana_arranque_cv14
+
+        # Detectar parada
+        if cv14_valor_anterior == 1 and valor_9144 != 1:
+            cv14_iteraciones_parada = ventana_parada_cv14
+
+        if not cv14_operando:
+            mascara = df_historico["Sistema"].isin(["CV_14"])
+            df_historico.loc[mascara, timestamp] = np.nan
+
+        if cv14_iteraciones_arranque > 0:
+            mascara = df_historico["Sistema"].isin(["CV_14"])
+            df_historico.loc[mascara, timestamp] = np.nan
+            cv14_iteraciones_arranque -= 1
+
+        if cv14_iteraciones_parada > 0:
+            mascara = df_historico["Sistema"].isin(["CV_14"])
+            df_historico.loc[mascara, timestamp] = np.nan
+            cv14_iteraciones_parada -= 1
+
+        cv14_valor_anterior = valor_9144
+
+
+        if not cv15_operando:
+            mascara = df_historico["Sistema"].isin(["CV_15"])
+            df_historico.loc[mascara, timestamp] = np.nan
+
+    df_historico = df_historico.drop(columns=["Sistema"])
+
     return df_historico
 
 ACCIONES_SUBAREA = {

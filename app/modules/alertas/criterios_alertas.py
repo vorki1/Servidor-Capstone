@@ -157,9 +157,6 @@ def datos_y_alertas_instrumentos(df_tabla_alertas):
         for alerta in alertas_activas:
             data_alertas.append({
                 "Identificador": alerta.identificador,
-                "Area": alerta.area,
-                "Subarea": alerta.subarea,
-                "Sistema": alerta.sistema,
                 "Tipo_Alerta_DB": alerta.tipo_alerta,
                 "Nivel_Alerta_DB": alerta.nivel_alerta,
                 "Fecha_Inicio_Alarma": alerta.fecha_inicio,

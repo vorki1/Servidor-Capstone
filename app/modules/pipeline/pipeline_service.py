@@ -6,7 +6,7 @@ import numpy as np
 
 async def matriz_b():#Matriz B, historico, metricas y metricas en CSV
     info = await construccion_matriz_b()
-    await matriz_datos_c()
+    #await matriz_datos_c()
     return { "message": info }
 async def matriz_datos_c():#Metricas de matriz C
     df_medidas_estadisticas = await matriz_c_builder() #data frame de datos historicos matriz C

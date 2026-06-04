@@ -17,7 +17,7 @@ logger = crear_logger("Pipeline")
 
 async def construccion_datos_matriz_b():#Se construye la matriz B con datos historicos
     fecha_fin = tiempo_actual()
-    fecha_inicio = fecha_fin - relativedelta(days=10)
+    fecha_inicio = fecha_fin - relativedelta(days=15)
     periodo_muestreo_matriz_b = 1 #Muestreo de interpolación, cantidad de muestra por minuto (600000000 es un minuto)
     df_matriz_a_chancado_primario = subarea_acopio_fino() #Entrega un DF
     df_matriz_a_datos = await generar_dataframe_datos_historicos(df_matriz_a_chancado_primario, fecha_inicio, fecha_fin, periodo_muestreo_matriz_b,segundos_muestreo=0)
@@ -25,9 +25,10 @@ async def construccion_datos_matriz_b():#Se construye la matriz B con datos hist
     df_matriz_b_datos = filtrar_datos_historicos(df_matriz_a_datos,subarea)
     # ==========================================
     # GRAFICAR INSTRUMENTO Corriente CR-01:8949, CR-02:8950, PP-01 corriente del fijo 9049, PP-02 corriente del fijo 9053
+    #Acopio fino: corriente cv-12 9141, cv-13 8977, cv-14 8978, cv-15 8979, tr-01 4803
     # ==========================================
-    """ fila_8949 = df_matriz_b_datos[
-        df_matriz_b_datos["Identificador"] == 9053
+    fila_8949 = df_matriz_b_datos[
+        df_matriz_b_datos["Identificador"] == 8978
     ].iloc[0]
 
     # Quitar identificador
@@ -55,7 +56,7 @@ async def construccion_datos_matriz_b():#Se construye la matriz B con datos hist
     plt.ylabel("Valor")
     plt.grid(True)
 
-    plt.show() """
+    plt.show()
 
     logger.info("Envio la matriz B Construida con datos historicos")
     return df_matriz_b_datos
