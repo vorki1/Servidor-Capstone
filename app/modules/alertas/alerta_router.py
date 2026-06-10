@@ -15,3 +15,7 @@ router = APIRouter(
 @router.get("/")
 def obtener_alertas(solo_activas: bool = True,page: int = 1,limit: int = 100,db: Session = Depends(get_db)):
     return service.listar_alertas(db=db,solo_activas=solo_activas,page=page,limit=limit)
+
+@router.get("/tabla-alertas-instrumentos")
+async def tabla_alertas_instrumentos(db: Session = Depends(get_db)):
+    return service.listar_alertas_activas(db)

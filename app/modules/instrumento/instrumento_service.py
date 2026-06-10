@@ -4,26 +4,12 @@ from ..pipeline.data_loader import datos_matriz_a, datos_historicos_por_instrume
 from ..pipeline.matriz_c import leer_metricas_matriz_b
 from datetime import timedelta
 
-def historico_instrumento():#Para datos si necesita el Gilbert, sino para la casa nomas
-    #Llamada a la API de "Metris" para obtener datos historicos de un instrumento
+def historico_instrumento():
     data = historico_instrumento_metris_api()
-    df = pd.DataFrame(data)
-    """
-    df = df.astype(object).where(pd.notnull(df), None)
-     # Asegurar solo columnas necesarias
-    df = df[["x", "y"]]
-    # Crear CSV en memoria
-    buffer = StringIO()
-    df.to_csv(buffer, index=False)
 
-    buffer.seek(0)
-    return StreamingResponse(
-        buffer,
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": "attachment; filename=6248_2026.csv"
-        }    ) """
-    return df.to_dict(orient='records')  # Convertir el DataFrame a una lista de diccionarios
+    df = pd.DataFrame(data)
+
+    return df.to_dict(orient='records')
 
 async def areas_unicas():#A visualizador
     df_response = datos_matriz_a()
@@ -57,11 +43,6 @@ async def sistemas_por_subarea(subarea):
         .unique()
         .tolist()
     )
-    print(
-    df[
-        ["Subarea", "Sistema"]
-    ].drop_duplicates()
-)
 
     return sistemas
 async def instrumentos_por_sistema(sistema):

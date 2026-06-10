@@ -60,11 +60,44 @@ async def ultimo_valor_interpolado_por_instrumento(instrumento_id,fecha_inicio,f
     return ultimo
 #===================================================EXCEL Y GENERACION MATRIZ A ==========================================================
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-EXCEL_PATH = BASE_DIR / "data" / "TagsCNN_2026-04-30_area_seca.xlsx"
+EXCEL_PATH = BASE_DIR / "data" / "TagsCNN_area_seca.xlsx"
 
 _df_instrumentos_mapeados = None
 _df_matriz_a = None
+_ids_booleanos = None
+INSTRUMENTOS_CONTROL_OPERACIONAL = [
+    8954, 8975, 9092,
+    8955, 9599,
+    22258, 9016, 6265,
+    22180, 9017, 9081,
+    8986, 9242, 5756, 5754, 9066, 9144, 9145, 4569
+]
+def ids_booleanos():
+    global _ids_booleanos
 
+    if _ids_booleanos is None:
+
+        df_matriz_a = datos_matriz_a()
+
+        _ids_booleanos = set(
+            df_matriz_a.loc[
+                df_matriz_a["Unidad_de_Ingenieria"]
+                .astype(str)
+                .str.upper()
+                .str.strip()
+                == "BOOL",
+                "Identificador"
+            ]
+        )
+
+        _ids_booleanos -= set(
+            INSTRUMENTOS_CONTROL_OPERACIONAL
+        )
+        print(
+            f"Booleanos encontrados: {len(_ids_booleanos)}"
+        )
+
+    return _ids_booleanos.copy()
 def datos_excel_instrumentos_mapeados():
     global _df_instrumentos_mapeados
 

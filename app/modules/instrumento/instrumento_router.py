@@ -13,6 +13,9 @@ router = APIRouter(
     tags=["instrumento"]
 )
 
+@router.get("/datos")
+def obtener_historico_instrumento():
+    return historico_instrumento()
 @router.get("/areas")#Endpoint de todas las areas
 async def todas_las_areas():
     return await areas_unicas()
@@ -32,3 +35,4 @@ async def info_instrumento(id:int):
 @router.get("/{id}/historico")#Endpoint del historial de tiempo de un instrumento
 async def datos_historicos_por_instrumento(id:int,minutos:int):
     return await datos_historicos_por_id(id,minutos)
+

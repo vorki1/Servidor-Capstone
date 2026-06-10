@@ -11,45 +11,42 @@ TIEMPO_CONGELADO = 0
 
 
 def historico_instrumento_metris_api():
+
     METRIS_BASE_URI = settings.METRIS_BASE_URI
     METRIS_TOKEN = settings.METRIS_TOKEN
+
     headers = {
         "Authorization": f"Bearer {METRIS_TOKEN}"
     }
 
     url = f"{METRIS_BASE_URI}/api/public/Historian/trendvalues"
 
-    
+    now = datetime.now(timezone.utc)
+
     one_hour_ago = now - timedelta(hours=1)
     five_minutes_ago = now - timedelta(minutes=5)
-    now = datetime.now(timezone.utc)
-
-    enero_2021 = datetime(2021, 1, 1, tzinfo=timezone.utc)
-    enero_2021_end = datetime(2021, 12, 31, tzinfo=timezone.utc)
-    enero_2022 = datetime(2022, 1, 1, tzinfo=timezone.utc)
-    enero_2022_end = datetime(2022, 12, 31, tzinfo=timezone.utc)
-    enero_2023 = datetime(2023, 1, 1, tzinfo=timezone.utc)
-    enero_2023_end = datetime(2023, 12, 31, tzinfo=timezone.utc)
-    enero_2024 = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    enero_2024_end = datetime(2024, 12, 31, tzinfo=timezone.utc)
-    enero_2025 = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    enero_2025_end = datetime(2025, 12, 31, tzinfo=timezone.utc)
-    enero_2026 = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    now = datetime.now(timezone.utc)
 
     params = {
-        "ID": "6192",
-        "TagID": "6192",
-        "get_tag_values":6192,
-        "Start": five_minutes_ago.strftime("%Y-%m-%dT%H:%M:%SZ"),#Hora actual menos una hora en formato ISO 8601
-        "End": now.strftime("%Y-%m-%dT%H:%M:%SZ"),#Hora actual en formato ISO 8601
+        "ID": "6314",
+        "TagID": "6314",
+        "get_tag_values": 6314,
+        "Start": one_hour_ago.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "End": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "InterpolationMethod": 1,
-        "AggregateFunction": 0,#Cantidad de datos en el mismo json
+        "AggregateFunction": 0,
         "InterpolationResolutionType": 1,
-        "interpolationresolution": 600000000 #10.000.000 son 1 segundo, es decir, 1 muestra cada 100 segundos #1 tick = 100 nanosegundos
+        "interpolationresolution": 600000000
     }
-    response = requests.get(url, headers=headers, params=params, verify=False)
+
+    response = requests.get(
+        url,
+        headers=headers,
+        params=params,
+        verify=False
+    )
+
     data = response.json()
+
     return data
 
 

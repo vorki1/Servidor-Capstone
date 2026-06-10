@@ -2,12 +2,46 @@ from app.core.logger import crear_logger
 import pandas as pd
 import numpy as np
 from .data_loader import datos_matriz_a
+import matplotlib.pyplot as plt
 
 logger = crear_logger("Pipeline")
 
-def limpiar_columna(columna):
-    print("Limpiamos los datos de la columna")
-    return columna
+def graficar_instrumento_filtrado(df_historico, identificador, titulo):
+    df_fila = df_historico[
+        df_historico["Identificador"] == identificador
+    ]
+
+    if df_fila.empty:
+        print(f"No existe el instrumento {identificador} para graficar")
+        return
+
+    fila = df_fila.iloc[0]
+
+    serie = fila.drop(labels=["Identificador"])
+
+    serie.index = pd.to_datetime(
+        serie.index,
+        errors="coerce"
+    )
+
+    serie = pd.to_numeric(
+        serie,
+        errors="coerce"
+    )
+
+    plt.figure(figsize=(15, 5))
+
+    plt.plot(
+        serie.index,
+        serie.values
+    )
+
+    plt.title(titulo)
+    plt.xlabel("Timestamp")
+    plt.ylabel("Corriente")
+    plt.grid(True)
+
+    plt.show()
 
 def filtrar_chancado_primario(df_historico):
 
@@ -50,6 +84,39 @@ def filtrar_chancado_primario(df_historico):
             mascara = ~df_historico["Identificador"].isin([8954, 8975, 9092])
             # Poner NaN
             df_historico.loc[mascara, timestamp] = np.nan
+    """ graficar_instrumento_filtrado(
+        df_historico,
+        8949,
+        "Chancado Primario - Corriente CR-01 - 8949"
+    ) """
+    # Ver porcentaje de datos conservados
+    fila_8949 = df_historico[
+        df_historico["Identificador"] == 8949
+    ]
+
+    if not fila_8949.empty:
+
+        total_timestamps = len(df_historico.columns) - 1
+
+        timestamps_validos = (
+            fila_8949
+            .drop(columns=["Identificador"])
+            .notna()
+            .sum(axis=1)
+            .iloc[0]
+        )
+
+        porcentaje = (
+            timestamps_validos
+            / total_timestamps
+            * 100
+        )
+
+        print(
+            f"8949 conserva "
+            f"{timestamps_validos}/{total_timestamps} "
+            f"timestamps ({porcentaje:.2f}%)"
+        )
     return df_historico
 
 def filtrar_chancado_secundario(df_historico):
@@ -59,13 +126,11 @@ def filtrar_chancado_secundario(df_historico):
     fila_8955 = df_historico[
         df_historico["Identificador"] == 8955
     ].iloc[0]
-    print(f"Valores de control para CR-02:\n{fila_8955.head()}")
 
     # Obtener fila de control tonelaje / peso
     fila_9599 = df_historico[
         df_historico["Identificador"] == 9599
     ].iloc[0]
-    print(f"Valores de control para tonelaje:\n{fila_9599.head()}")
     # Quitar columna Identificador
     control_8955 = fila_8955.drop(labels=["Identificador"])
     control_9599 = fila_9599.drop(labels=["Identificador"])
@@ -84,6 +149,39 @@ def filtrar_chancado_secundario(df_historico):
             mascara = ~df_historico["Identificador"].isin([8955, 9599])
             # Poner NaN
             df_historico.loc[mascara, timestamp] = np.nan
+    """ graficar_instrumento_filtrado(
+        df_historico,
+        8950,
+        "Chancado Secundario - Corriente CR-02 - 8950"
+    ) """
+    # Ver porcentaje de datos conservados
+    fila_8950 = df_historico[
+        df_historico["Identificador"] == 8950
+    ]
+
+    if not fila_8950.empty:
+
+        total_timestamps = len(df_historico.columns) - 1
+
+        timestamps_validos = (
+            fila_8950
+            .drop(columns=["Identificador"])
+            .notna()
+            .sum(axis=1)
+            .iloc[0]
+        )
+
+        porcentaje = (
+            timestamps_validos
+            / total_timestamps
+            * 100
+        )
+
+        print(
+            f"8950 conserva "
+            f"{timestamps_validos}/{total_timestamps} "
+            f"timestamps ({porcentaje:.2f}%)"
+        )
     return df_historico
 
 def filtrar_chancado_terciario(df_historico):
@@ -118,7 +216,39 @@ def filtrar_chancado_terciario(df_historico):
             )
 
             df_historico.loc[mascara, timestamp] = np.nan
+    """ graficar_instrumento_filtrado(
+        df_historico,
+        9049,
+        "Chancado Terciario - Corriente PP-01 fijo - 9049"
+    ) """
+    # Ver porcentaje de datos conservados
+    fila_9049 = df_historico[
+        df_historico["Identificador"] == 9049
+    ]
 
+    if not fila_9049.empty:
+
+        total_timestamps = len(df_historico.columns) - 1
+
+        timestamps_validos = (
+            fila_9049
+            .drop(columns=["Identificador"])
+            .notna()
+            .sum(axis=1)
+            .iloc[0]
+        )
+
+        porcentaje = (
+            timestamps_validos
+            / total_timestamps
+            * 100
+        )
+
+        print(
+            f"9049 conserva "
+            f"{timestamps_validos}/{total_timestamps} "
+            f"timestamps ({porcentaje:.2f}%)"
+        )
     return df_historico
 
 def filtrar_chancado_cuaternario(df_historico):
@@ -152,6 +282,39 @@ def filtrar_chancado_cuaternario(df_historico):
             )
 
             df_historico.loc[mascara, timestamp] = np.nan
+    """ graficar_instrumento_filtrado(
+        df_historico,
+        9053,
+        "Chancado Cuaternario - Corriente PP-02 fijo - 9053"
+    ) """
+    # Ver porcentaje de datos conservados
+    fila_9053 = df_historico[
+        df_historico["Identificador"] == 9053
+    ]
+
+    if not fila_9053.empty:
+
+        total_timestamps = len(df_historico.columns) - 1
+
+        timestamps_validos = (
+            fila_9053
+            .drop(columns=["Identificador"])
+            .notna()
+            .sum(axis=1)
+            .iloc[0]
+        )
+
+        porcentaje = (
+            timestamps_validos
+            / total_timestamps
+            * 100
+        )
+
+        print(
+            f"9053 conserva "
+            f"{timestamps_validos}/{total_timestamps} "
+            f"timestamps ({porcentaje:.2f}%)"
+        )
     return df_historico
 
 def filtrar_acopio_fino(df_historico):

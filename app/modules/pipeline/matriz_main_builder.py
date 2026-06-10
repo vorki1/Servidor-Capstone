@@ -1,4 +1,4 @@
-from .data_loader import datos_historicos_por_instrumento,ultimo_valor_interpolado_por_instrumento
+from .data_loader import datos_historicos_por_instrumento,ultimo_valor_interpolado_por_instrumento,INSTRUMENTOS_CONTROL_OPERACIONAL,ids_booleanos
 import pandas as pd
 from datetime import datetime, timezone
 import asyncio
@@ -34,7 +34,8 @@ async def obtener_historico(identificador, fecha_inicio, fecha_fin, minutos_mues
             print(f"Error al obtener datos históricos para el identificador {identificador}")
         #Si no existe una fila con Y, tirara error
         logger.error(f"No hay dato historico 'Y' para: ,{identificador}: {e}")
-def eliminar_booleanos(df):
+
+""" def eliminar_booleanos_antes(df):
     filas_a_mantener = []
     for _, fila in df.iterrows():
         identificador = fila["Identificador"]
@@ -54,27 +55,40 @@ def eliminar_booleanos(df):
         es_booleano = valores_unicos.issubset({0.0, 1.0,-1.0})
         #-------------Chancado primario-Chancado secundario:8955-Chancado Terciario:8956,9016-Chancado cuaternario 22180,9017
         #-------------Acopio fino:8986,9145
-        no_eliminar = [
-            8954, 8975, 9092,
-            8955,
-            22258, 9016,
-            22180, 9017,
-            8986, 5756, 5754, 9066, 9144, 9145
-        ]
-        if not es_booleano or identificador in no_eliminar:
+
+        if not es_booleano or identificador in INSTRUMENTOS_CONTROL_OPERACIONAL:
             filas_a_mantener.append(fila)
-    return pd.DataFrame(filas_a_mantener)
-async def generar_dataframe_datos_historicos(df_matriz,fecha_inicio,fecha_fin, minutos_muestreo,segundos_muestreo):#Aux historicos para cualquier matriz
-    #=================== Lista de identificadores==========================
+    return pd.DataFrame(filas_a_mantener) """
+def eliminar_booleanos(df):
+
+    ids_a_eliminar = ids_booleanos()
+
+    return df[
+        ~df["Identificador"].isin(ids_a_eliminar)
+    ]
+def eliminar_booleanos_control(df):
+
+    df = df[
+        ~df["Identificador"].isin(INSTRUMENTOS_CONTROL_OPERACIONAL)
+    ].copy()
+    
+
+    return df
+async def generar_dataframe_datos_historicos(
+    df_matriz,
+    fecha_inicio,
+    fecha_fin,
+    minutos_muestreo,
+    segundos_muestreo
+):
     identificadores = df_matriz["Identificador"].tolist()
-    # =========================
-    # Obtención concurrente
-    # =========================
+
+    logger.info(f"IDs solicitados al historian: {len(identificadores)}")
+
     semaphore = asyncio.Semaphore(10)
+
     async def obtener_historico_limitado(identificador):
-
         async with semaphore:
-
             return await obtener_historico(
                 identificador,
                 fecha_inicio,
@@ -82,53 +96,92 @@ async def generar_dataframe_datos_historicos(df_matriz,fecha_inicio,fecha_fin, m
                 minutos_muestreo,
                 segundos_muestreo
             )
-    tasks = [#Esto crea ordenes de hacer algo, pero no lo hace aún
+
+    tasks = [
         obtener_historico_limitado(id)
         for id in identificadores
     ]
-    resultados = await asyncio.gather(*tasks)#Esto es el trabajo todo junto y concurrente
-    # =========================
-    # Construcción registros
-    # =========================
+
+    resultados = await asyncio.gather(*tasks)
+
+    ids_con_respuesta = []
+    ids_sin_respuesta = []
+    ids_sin_data = []
+
     registros = []
+
     for resultado in resultados:
         if resultado is None:
+            ids_sin_respuesta.append(None)
             continue
-        else:
-            identificador = resultado["identificador"]
 
-            for punto in resultado["data"]:
-                registros.append({
-                    "Identificador": identificador,
-                    "timestamp": punto.get("x"),
-                    "valor": float(punto.get("y")) if punto.get("y") is not None else None
-                })
-    # =========================
-    # DataFrame largo
-    # =========================
-    df_historicos  = pd.DataFrame(registros)
-    
-    # =========================
-    # Matriz pivotada
-    # =========================
+        identificador = resultado["identificador"]
+        data = resultado["data"]
+
+        if not data:
+            ids_sin_data.append(identificador)
+            continue
+
+        ids_con_respuesta.append(identificador)
+
+        for punto in data:
+            registros.append({
+                "Identificador": identificador,
+                "timestamp": punto.get("x"),
+                "valor": float(punto.get("y")) if punto.get("y") is not None else None
+            })
+
+    logger.info(f"IDs con data historian: {len(ids_con_respuesta)}")
+    logger.info(f"IDs sin data historian: {len(ids_sin_data)}")
+
+    if ids_sin_data:
+        logger.info(f"IDs sin data: {ids_sin_data}")
+
+    df_historicos = pd.DataFrame(registros)
+
+    if df_historicos.empty:
+        logger.warning("df_historicos viene vacío")
+        return pd.DataFrame(columns=["Identificador"])
+
     df_matriz_datos = df_historicos.pivot_table(
         index="Identificador",
         columns="timestamp",
         values="valor",
         aggfunc="last"
-    )
-    df_matriz_datos = (
-        df_matriz_datos
-        .reset_index()
-    )
+    ).reset_index()
+
     df_matriz_datos.columns.name = None
-    
-    df_matriz_datos = eliminar_booleanos(df_matriz_datos)
-    df_matriz_datos["Identificador"] = (
-        df_matriz_datos["Identificador"]
-        .astype("Int64")
+
+    logger.info(f"IDs después del pivot: {len(df_matriz_datos)}")
+
+    ids_antes_booleanos = set(
+        df_matriz_datos["Identificador"].dropna().astype(int).tolist()
     )
 
+    df_matriz_datos = eliminar_booleanos(df_matriz_datos)
+
+    ids_despues_booleanos = set(
+        df_matriz_datos["Identificador"].dropna().astype(int).tolist()
+    )
+
+    ids_eliminados_booleanos = sorted(
+        ids_antes_booleanos - ids_despues_booleanos
+    )
+
+    logger.info(
+        f"IDs después de eliminar_booleanos: {len(df_matriz_datos)}"
+    )
+
+    logger.info(
+        f"IDs eliminados por eliminar_booleanos: {len(ids_eliminados_booleanos)}"
+    )
+
+    if ids_eliminados_booleanos:
+        logger.info(f"IDs eliminados: {ids_eliminados_booleanos}")
+
+    df_matriz_datos["Identificador"] = (
+        df_matriz_datos["Identificador"].astype("Int64")
+    )
 
     return df_matriz_datos
 
