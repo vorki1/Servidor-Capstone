@@ -9,6 +9,7 @@ from .filtros_iniciales import (
     eliminar_instrumentos_control_operacional
 )
 
+from time import perf_counter
 import pandas as pd
 import asyncio
 from dateutil.relativedelta import relativedelta
@@ -20,6 +21,7 @@ from .storage import guardar_metricas_matriz_b
 from app.core.logger import crear_logger
 
 logger = crear_logger("Pipeline")
+
 
 SUBAREAS_MATRIZ_B = [
     subarea_chancado_primario,
@@ -40,6 +42,8 @@ async def procesar_subarea_matriz_b(
     semaforo
 ):
     async with semaforo:
+        t0 = perf_counter()
+
         df_matriz_a_subarea = obtener_subarea()
 
         if df_matriz_a_subarea.empty:
@@ -67,12 +71,17 @@ async def procesar_subarea_matriz_b(
             subarea
         )
 
+        logger.info(
+            f"{subarea} | terminado en "
+            f"{perf_counter() - t0:.2f} segundos"
+        )
+
         return df_matriz_b_datos
 
 
 async def construccion_datos_matriz_b():
     fecha_fin = tiempo_actual()
-    fecha_inicio = fecha_fin - relativedelta(days=30)
+    fecha_inicio = fecha_fin - relativedelta(days=15)
 
     periodo_muestreo_matriz_b = 1
     semaforo = asyncio.Semaphore(2)
@@ -132,6 +141,8 @@ def analizar_metricas_matriz_b(df_metricas):
 
 async def construccion_matriz_b():
     async with matriz_b_lock:
+        t0 = perf_counter()
+
         df_datos_matriz_b = await construccion_datos_matriz_b()
 
         if df_datos_matriz_b.empty:
@@ -146,11 +157,12 @@ async def construccion_matriz_b():
 
         guardar_metricas_matriz_b(df_medidas_estadisticas)
 
-        info = (
+        logger.info(
+            f"Matriz B total finalizada en "
+            f"{perf_counter() - t0:.2f} segundos"
+        )
+
+        return (
             "Se construyó la matriz B con sus medidas estadísticas "
             "y se guardó en CSV"
         )
-
-        logger.info(info)
-
-        return info

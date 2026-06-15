@@ -72,7 +72,7 @@ async def generar_dataframe_datos_historicos(
     resultados = await asyncio.gather(*tasks)
 
     registros = []
-
+    
     for resultado in resultados:
         if resultado is None:
             continue

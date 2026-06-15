@@ -26,13 +26,18 @@ async def areas_unicas():
     areas = (
         df_response["Area"]
         .dropna()
-        .loc[lambda x: x != 0]
+        .astype(str)
+        .str.strip()
+        .loc[lambda x: x.str.upper() != "VACIO"]
+        .loc[lambda x: x.str.upper() != "S/D"]
+        .loc[lambda x: x.str.isnumeric()]
+        .astype(int)
         .unique()
         .tolist()
     )
 
     return {
-        "areas": areas
+        "areas": sorted(areas)
     }
 
 
@@ -49,7 +54,7 @@ async def subareas_de_area(area):
         .unique()
         .tolist()
     )
-
+    
     return {
         "area": area,
         "subareas": subareas

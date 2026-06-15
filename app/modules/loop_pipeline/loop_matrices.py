@@ -17,7 +17,6 @@ async def loop_pipeline():
             inicio = datetime.now()
 
             logger.info("===== Inicio ciclo pipeline =====")
-            logger.info(f"Hora inicio: {inicio}")
 
             if pipeline_state.MATRIZ_B_EN_PROCESO:
                 logger.info(
@@ -31,7 +30,6 @@ async def loop_pipeline():
             fin = datetime.now()
             duracion = (fin - inicio).total_seconds()
 
-            logger.info(f"Hora fin: {fin}")
             logger.info(f"Duración ciclo: {duracion:.2f} segundos")
             logger.info("===== Fin ciclo pipeline =====")
 

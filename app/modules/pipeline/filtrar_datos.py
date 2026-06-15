@@ -196,7 +196,6 @@ def agregar_sistema_acopio_fino(df_historico):
         how="left"
     )
 
-
 def obtener_serie_control_acopio(df_historico, identificador):
     fila = df_historico[
         df_historico["Identificador"] == identificador
@@ -216,7 +215,6 @@ def obtener_serie_control_acopio(df_historico, identificador):
         errors="coerce"
     )
 
-
 def construir_controles_acopio(df_historico):
     controles = {}
 
@@ -233,7 +231,6 @@ def construir_controles_acopio(df_historico):
 
     return controles
 
-
 def construir_controles_feeders(df_historico):
     controles_feeders = {}
 
@@ -249,7 +246,6 @@ def construir_controles_feeders(df_historico):
         controles_feeders[feeder["sistema"]] = serie
 
     return controles_feeders
-
 
 def construir_mascaras_sistema(df_historico):
     sistemas = [
@@ -277,6 +273,8 @@ def filtrar_acopio_fino(df_historico):
     controles = construir_controles_acopio(df_historico)
 
     if controles is None:
+        logger.warning("Acopio Fino | no se pudieron construir controles")
+
         return df_historico.drop(
             columns=["Sistema"],
             errors="ignore"
@@ -286,138 +284,146 @@ def filtrar_acopio_fino(df_historico):
 
     mascaras_sistema = construir_mascaras_sistema(df_historico)
 
-    cv14_valor_anterior = 0
-    cv14_iteraciones_arranque = 0
-    cv14_iteraciones_parada = 0
+    timestamps = controles["cv12_run"].index
+
+    cv12_operando = (
+        (controles["cv12_run"] == 1)
+        & (controles["cv12_tonelaje"] > 500)
+    )
+
+    cv13_operando = (
+        cv12_operando
+        & (controles["cv13_run"] == 1)
+    )
+
+    tr01_operando = (
+        cv12_operando
+        & (controles["tr01_run"] == 1)
+    )
+
+    sk01_operando = (
+        tr01_operando
+        & (controles["sk01_run"] == 1)
+    )
+
+    cv14_operando_base = (
+        controles["cv14_run"] == 1
+    )
+
+    cv15_operando = (
+        (controles["cv15_run"] == 1)
+        & (controles["cv15_tonelaje"] > 950)
+        & (
+            cv13_operando
+            | cv14_operando_base
+        )
+    )
+
+    bh09_operando = (
+        controles["bh09_run"] == 1
+    )
+
+    base_feeders_operando = (
+        cv14_operando_base
+        & cv15_operando
+        & bh09_operando
+    )
+
+    cv14_run = controles["cv14_run"]
+
+    arranque_cv14 = (
+        (cv14_run.shift(1).fillna(0) != 1)
+        & (cv14_run == 1)
+    )
+
+    parada_cv14 = (
+        (cv14_run.shift(1).fillna(0) == 1)
+        & (cv14_run != 1)
+    )
 
     ventana_arranque_cv14 = 40
     ventana_parada_cv14 = 5
 
-    timestamps = controles["cv12_run"].index
+    cv14_bloqueo_arranque = pd.Series(
+        False,
+        index=timestamps
+    )
 
-    for timestamp in timestamps:
-        valor_8986 = controles["cv12_run"][timestamp]
-        valor_9242 = controles["cv12_tonelaje"][timestamp]
-        valor_5756 = controles["cv13_run"][timestamp]
-        valor_5754 = controles["tr01_run"][timestamp]
-        valor_9066 = controles["sk01_run"][timestamp]
-        valor_9144 = controles["cv14_run"][timestamp]
-        valor_9145 = controles["cv15_run"][timestamp]
-        valor_4569 = controles["cv15_tonelaje"][timestamp]
-        valor_5752 = controles["bh09_run"][timestamp]
+    cv14_bloqueo_parada = pd.Series(
+        False,
+        index=timestamps
+    )
 
-        cv12_operando = (
-            valor_8986 == 1
-            and valor_9242 > 500
+    posiciones_arranque = [
+        i for i, valor in enumerate(arranque_cv14.to_numpy())
+        if valor
+    ]
+
+    posiciones_parada = [
+        i for i, valor in enumerate(parada_cv14.to_numpy())
+        if valor
+    ]
+
+    for pos in posiciones_arranque:
+        cv14_bloqueo_arranque.iloc[
+            pos:pos + ventana_arranque_cv14
+        ] = True
+
+    for pos in posiciones_parada:
+        cv14_bloqueo_parada.iloc[
+            pos:pos + ventana_parada_cv14
+        ] = True
+
+    cv14_operando = (
+        cv14_operando_base
+        & ~cv14_bloqueo_arranque
+        & ~cv14_bloqueo_parada
+    )
+
+    columnas_tiempo = [
+        col for col in df_historico.columns
+        if col not in ["Identificador", "Sistema"]
+    ]
+
+    valores = df_historico[columnas_tiempo].to_numpy(
+        dtype=float,
+        copy=True
+    )
+
+    sistemas_array = df_historico["Sistema"].to_numpy()
+
+    def aplicar_nan_numpy(sistema, condicion_operando):
+        filas = sistemas_array == sistema
+        columnas = (~condicion_operando).to_numpy()
+
+        if filas.any() and columnas.any():
+            valores[np.ix_(filas, columnas)] = np.nan
+
+    aplicar_nan_numpy("CV_12", cv12_operando)
+    aplicar_nan_numpy("CV_13", cv13_operando)
+    aplicar_nan_numpy("TR_01", tr01_operando)
+    aplicar_nan_numpy("SK_01", sk01_operando)
+    aplicar_nan_numpy("CV_14", cv14_operando)
+    aplicar_nan_numpy("CV_15", cv15_operando)
+
+    for sistema_feeder, control_feeder in controles_feeders.items():
+        feeder_operando = (
+            base_feeders_operando
+            & (control_feeder == 1)
         )
 
-        cv13_operando = (
-            cv12_operando
-            and valor_5756 == 1
+        aplicar_nan_numpy(
+            sistema_feeder,
+            feeder_operando
         )
 
-        tr01_operando = (
-            cv12_operando
-            and valor_5754 == 1
-        )
+    df_valores_filtrados = pd.DataFrame(
+        valores,
+        columns=columnas_tiempo,
+        index=df_historico.index
+    )
 
-        sk01_operando = (
-            tr01_operando
-            and valor_9066 == 1
-        )
-
-        cv14_operando = valor_9144 == 1
-
-        cv15_operando = (
-            valor_9145 == 1
-            and valor_4569 > 950
-            and (
-                cv13_operando
-                or cv14_operando
-            )
-        )
-
-        bh09_operando = valor_5752 == 1
-
-        base_feeders_operando = (
-            cv14_operando
-            and cv15_operando
-            and bh09_operando
-        )
-
-        for sistema_feeder, control_feeder in controles_feeders.items():
-            valor_feeder = control_feeder[timestamp]
-
-            feeder_operando = (
-                base_feeders_operando
-                and valor_feeder == 1
-            )
-
-            if not feeder_operando:
-                df_historico.loc[
-                    mascaras_sistema[sistema_feeder],
-                    timestamp
-                ] = np.nan
-
-        if not cv12_operando:
-            df_historico.loc[
-                mascaras_sistema["CV_12"],
-                timestamp
-            ] = np.nan
-
-        if not cv13_operando:
-            df_historico.loc[
-                mascaras_sistema["CV_13"],
-                timestamp
-            ] = np.nan
-
-        if not tr01_operando:
-            df_historico.loc[
-                mascaras_sistema["TR_01"],
-                timestamp
-            ] = np.nan
-
-        if not sk01_operando:
-            df_historico.loc[
-                mascaras_sistema["SK_01"],
-                timestamp
-            ] = np.nan
-
-        if cv14_valor_anterior != 1 and valor_9144 == 1:
-            cv14_iteraciones_arranque = ventana_arranque_cv14
-
-        if cv14_valor_anterior == 1 and valor_9144 != 1:
-            cv14_iteraciones_parada = ventana_parada_cv14
-
-        if not cv14_operando:
-            df_historico.loc[
-                mascaras_sistema["CV_14"],
-                timestamp
-            ] = np.nan
-
-        if cv14_iteraciones_arranque > 0:
-            df_historico.loc[
-                mascaras_sistema["CV_14"],
-                timestamp
-            ] = np.nan
-
-            cv14_iteraciones_arranque -= 1
-
-        if cv14_iteraciones_parada > 0:
-            df_historico.loc[
-                mascaras_sistema["CV_14"],
-                timestamp
-            ] = np.nan
-
-            cv14_iteraciones_parada -= 1
-
-        cv14_valor_anterior = valor_9144
-
-        if not cv15_operando:
-            df_historico.loc[
-                mascaras_sistema["CV_15"],
-                timestamp
-            ] = np.nan
+    df_historico.loc[:, columnas_tiempo] = df_valores_filtrados
 
     df_historico = df_historico.drop(
         columns=["Sistema"],

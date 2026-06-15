@@ -12,6 +12,9 @@ from app.infrastructure.metrisapi.historian import (
     InterpolationResolutionType,
     ticks_from
 )
+
+from app.core.logger import crear_logger
+logger = crear_logger("Pipeline")
 #######CRITICO!!!!!!!!!!!!!!!##################################
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -84,7 +87,10 @@ def datos_excel_instrumentos_mapeados():
     global _df_instrumentos_mapeados
 
     if _df_instrumentos_mapeados is None:
-        _df_instrumentos_mapeados = pd.read_excel(EXCEL_PATH).convert_dtypes()
+        logger.info("Leyendo el excel nuevamente")
+        df = pd.read_excel(EXCEL_PATH)
+
+        _df_instrumentos_mapeados = df.convert_dtypes()
 
     return _df_instrumentos_mapeados.copy()
 
@@ -143,6 +149,7 @@ def datos_matriz_a():
         df_mapeo_instrumentos[cols_str] = (
             df_mapeo_instrumentos[cols_str]
             .fillna("Vacio")
+            .astype(str)
             .apply(lambda col: col.str.strip())
         )
 
@@ -154,13 +161,11 @@ def datos_matriz_a():
             df_mapeo_instrumentos[cols_num]
             .fillna(0)
         )
-
         df_mapeo_instrumentos = df_mapeo_instrumentos[
             ~df_mapeo_instrumentos["Identificador"].isin(
                 ids_booleanos()
             )
         ]
-
         _df_matriz_a = df_mapeo_instrumentos
 
     return _df_matriz_a.copy()

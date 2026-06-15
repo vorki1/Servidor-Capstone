@@ -20,7 +20,7 @@ def obtener_historico_instrumento():
 async def todas_las_areas():
     return await areas_unicas()
 @router.get("/areas/{area}/subareas")#Endpoint de todas las subareas de un area
-async def todas_las_subareas_de_area(area:int):
+async def todas_las_subareas_de_area(area:str):
     return await subareas_de_area(area)
 
 @router.get("/subareas/{subarea}/sistemas")
@@ -35,4 +35,3 @@ async def info_instrumento(id:int):
 @router.get("/{id}/historico")
 async def datos_historicos_por_instrumento(id: int, minutos: int):
     return await datos_historicos_por_id(id, minutos)
-
