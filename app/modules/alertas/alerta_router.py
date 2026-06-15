@@ -18,3 +18,9 @@ def obtener_alertas(solo_activas: bool = True,page: int = 1,limit: int = 100,db:
 @router.get("/tabla-alertas-instrumentos")
 def tabla_alertas_instrumentos(db: Session = Depends(get_db)):
     return service.listar_alertas_activas(db)
+
+@router.get("/estadisticas")
+def obtener_estadisticas(
+    db: Session = Depends(get_db)
+):
+    return service.obtener_estadisticas_dashboard(db)

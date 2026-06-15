@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 import math
-
+from sqlalchemy import func
+from app.modules.instrumento.instrumento_service import datos_matriz_a
 from sqlalchemy.orm import Session
-
 from app.modules.alertas.alerta_model import AlertaInstrumento
 from app.modules.alertas import alerta_repository as repo
 from .alerta_constants import TIPOS_ALERTA
@@ -222,3 +222,105 @@ def procesar_alerta_individual(
     db.refresh(nueva_alerta)
 
     return nueva_alerta
+
+def obtener_estadisticas_dashboard(db):
+
+    # ---------------------------------
+    # Sensores monitoreados
+    # ---------------------------------
+
+    df_instrumentos = datos_matriz_a()
+
+    total_sensores = len(df_instrumentos)
+
+    sensores_con_fallas = (
+        db.query(
+            func.count(
+                func.distinct(
+                    AlertaInstrumento.identificador
+                )
+            )
+        )
+        .filter(
+            AlertaInstrumento.activa == True
+        )
+        .scalar()
+    )
+
+    porcentaje_con_fallas = round(
+        (sensores_con_fallas / total_sensores) * 100,
+        2
+    ) if total_sensores > 0 else 0
+
+    # ---------------------------------
+    # Alertas por nivel
+    # ---------------------------------
+
+    alertas_por_nivel = (
+        db.query(
+            AlertaInstrumento.nivel_alerta,
+            func.count().label("cantidad")
+        )
+        .filter(
+            AlertaInstrumento.activa == True
+        )
+        .group_by(
+            AlertaInstrumento.nivel_alerta
+        )
+        .all()
+    )
+
+    preventivas = 0
+    criticas = 0
+    emergencias = 0
+
+    for nivel, cantidad in alertas_por_nivel:
+
+        nivel = nivel.upper()
+
+        if nivel == "PREVENTIVO":
+            preventivas = cantidad
+
+        elif nivel == "CRITICO":
+            criticas = cantidad
+
+        elif nivel == "EMERGENCIA":
+            emergencias = cantidad
+
+    # ---------------------------------
+    # Sistema con más alertas
+    # ---------------------------------
+
+    sistema_mas_alertas = (
+        db.query(
+            AlertaInstrumento.sistema,
+            func.count().label("cantidad")
+        )
+        .filter(
+            AlertaInstrumento.activa == True
+        )
+        .group_by(
+            AlertaInstrumento.sistema
+        )
+        .order_by(
+            func.count().desc()
+        )
+        .first()
+    )
+
+    return {
+        "sensores": {
+            "total": total_sensores,
+            "con_fallas": sensores_con_fallas,
+            "porcentaje_con_fallas": porcentaje_con_fallas
+        },
+        "alertas": {
+            "preventivas": preventivas,
+            "criticas": criticas,
+            "emergencias": emergencias
+        },
+        "sistema_mas_alertas": {
+            "sistema": sistema_mas_alertas[0] if sistema_mas_alertas else None,
+            "cantidad_alertas": sistema_mas_alertas[1] if sistema_mas_alertas else 0
+        }
+    }
