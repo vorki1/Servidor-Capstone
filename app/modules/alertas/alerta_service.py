@@ -1,18 +1,11 @@
 from datetime import datetime, timezone
+import math
+
 from sqlalchemy.orm import Session
 
 from app.modules.alertas.alerta_model import AlertaInstrumento
 from app.modules.alertas import alerta_repository as repo
-import math
-
-TIPOS_ALERTA = {
-    "Alerta_Cambio_Brusco": "CAMBIO_BRUSCO",
-    "Alerta_Oscilacion": "OSCILACION",
-    "Alerta_Senal_Congelada": "SENAL_CONGELADA",
-    "Alerta_Todos_Cero": "TODOS_CERO",
-    "Alerta_Media_Congelada": "MEDIA_CONGELADA",
-    "Alerta_Senal_Recuperada": "SENAL_RECUPERADA",
-}
+from .alerta_constants import TIPOS_ALERTA
 
 
 def listar_alertas_activas(db: Session):
@@ -46,6 +39,7 @@ def listar_alertas_historicas(db: Session):
 def listar_todas_las_alertas(db: Session):
     return repo.obtener_todas(db)
 
+
 def listar_alertas(
     db: Session,
     solo_activas: bool = True,
@@ -75,32 +69,55 @@ def listar_alertas(
         "data": alertas
     }
 
+
+def construir_alertas_presentes_del_ciclo(df_alertas):
+    alertas_presentes = set()
+
+    for _, fila in df_alertas.iterrows():
+        identificador = int(fila["Identificador"])
+
+        for columna_df, tipo_alerta in TIPOS_ALERTA.items():
+            if columna_df not in df_alertas.columns:
+                continue
+
+            nivel_alerta = str(fila[columna_df]).strip().upper()
+
+            if nivel_alerta != "NORMAL":
+                alertas_presentes.add(
+                    (identificador, tipo_alerta)
+                )
+
+    return alertas_presentes
+
+
 def cerrar_alertas_ausentes_del_ciclo(db: Session, df_alertas):
     now = datetime.now(timezone.utc)
 
-    ids_ciclo = set(
-        df_alertas["Identificador"]
-        .dropna()
-        .astype(int)
-        .tolist()
+    alertas_presentes = construir_alertas_presentes_del_ciclo(
+        df_alertas
     )
 
     tipos_ciclo = list(TIPOS_ALERTA.values())
 
-    alertas_activas = (
-        db.query(AlertaInstrumento)
-        .filter(AlertaInstrumento.activa == True)
-        .filter(AlertaInstrumento.tipo_alerta.in_(tipos_ciclo))
-        .all()
+    alertas_activas = repo.obtener_activas_por_tipos(
+        db=db,
+        tipos_alerta=tipos_ciclo
     )
 
     for alerta in alertas_activas:
-        if alerta.identificador not in ids_ciclo:
+        clave_alerta = (
+            alerta.identificador,
+            alerta.tipo_alerta
+        )
+
+        if clave_alerta not in alertas_presentes:
             alerta.activa = False
             alerta.fecha_fin = now
             alerta.fecha_ultima_actualizacion = now
 
     db.commit()
+
+
 def procesar_alertas_dataframe(db: Session, df_alertas):
     alertas_procesadas = []
 
@@ -108,7 +125,6 @@ def procesar_alertas_dataframe(db: Session, df_alertas):
         identificador = int(fila["Identificador"])
 
         for columna_df, tipo_alerta in TIPOS_ALERTA.items():
-
             if columna_df not in df_alertas.columns:
                 continue
 
@@ -133,6 +149,8 @@ def procesar_alertas_dataframe(db: Session, df_alertas):
     cerrar_alertas_ausentes_del_ciclo(db, df_alertas)
 
     return alertas_procesadas
+
+
 def procesar_alerta_individual(
     db: Session,
     identificador: int,

@@ -1,5 +1,3 @@
-# app/modules/alertas/alerta_schema.py
-
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -11,6 +9,9 @@ class AlertaBase(BaseModel):
     nombre_tag: str | None = None
     descripcion: str | None = None
     unidad_de_ingenieria: str | None = None
+    area: str | None = None
+    subarea: str | None = None
+    sistema: str | None = None
 
 
 class AlertaCreate(AlertaBase):
@@ -22,6 +23,9 @@ class AlertaUpdate(BaseModel):
     nombre_tag: str | None = None
     descripcion: str | None = None
     unidad_de_ingenieria: str | None = None
+    area: str | None = None
+    subarea: str | None = None
+    sistema: str | None = None
     fecha_ultima_actualizacion: datetime | None = None
     fecha_fin: datetime | None = None
     ciclos: int | None = None

@@ -1,23 +1,30 @@
 from fastapi import APIRouter
 from threading import Thread
 import asyncio
+
 from . import pipeline_state
-from .pipeline_service import (matriz_b, matriz_datos_c, actualizar_tabla_ultimas_alertas, obtener_fecha_actualizacion_metricas_matriz_b)
+from .pipeline_service import (
+    matriz_b,
+    matriz_datos_c,
+    actualizar_tabla_ultimas_alertas,
+)
+from .storage import obtener_fecha_actualizacion_metricas_matriz_b
+
 
 router = APIRouter(
     prefix="/matriz",
     tags=["matriz"]
 )
+
+
 def ejecutar_matriz_b_thread():
     try:
         asyncio.run(matriz_b())
     finally:
         pipeline_state.MATRIZ_B_EN_PROCESO = False
 
-
 @router.post("/matriz-b")
 async def ejecutar_matriz_b():
-
     if pipeline_state.MATRIZ_B_EN_PROCESO:
         return {
             "estado": "en_proceso",
@@ -37,19 +44,23 @@ async def ejecutar_matriz_b():
         "estado": "iniciada",
         "mensaje": "Matriz B iniciada en segundo plano"
     }
+
 @router.get("/matriz-b/estado")
 async def estado_matriz_b():
     return {
         "matriz_b_en_proceso": pipeline_state.MATRIZ_B_EN_PROCESO
     }
+
 @router.get("/metricas-matriz-base/ultima-actualizacion")
 async def obtener_fecha_actualizacion_matriz_base():
     return obtener_fecha_actualizacion_metricas_matriz_b()
+
+
 @router.get("/matriz-c")
 async def construccion_matriz_c():
     data = await matriz_datos_c()
     return data.to_dict(orient="records")
-@router.get("/matriz-c-periodica")#Endpoint que se solicitara periodicamente cada 5 seg
+
 @router.get("/actualizar-tabla-alertas-activas")
 async def alertas_instrumentos():
     return await actualizar_tabla_ultimas_alertas()

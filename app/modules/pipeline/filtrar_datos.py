@@ -43,335 +43,248 @@ def graficar_instrumento_filtrado(df_historico, identificador, titulo):
 
     plt.show()
 
+def obtener_serie_control(df_historico, identificador):
+    fila = df_historico[
+        df_historico["Identificador"] == identificador
+    ]
+
+    if fila.empty:
+        logger.warning(f"No existe control {identificador}")
+        return None
+
+    return fila.iloc[0].drop(labels=["Identificador"])
+
+def aplicar_nan_por_detencion(df_historico,controles,condicion_detencion):
+    df_historico = df_historico.copy()
+
+    series_control = {}
+
+    for identificador in controles:
+        serie = obtener_serie_control(df_historico, identificador)
+
+        if serie is None:
+            return df_historico
+
+        series_control[identificador] = pd.to_numeric(
+            serie,
+            errors="coerce"
+        )
+
+    timestamps_detencion = condicion_detencion(series_control)
+
+    columnas_a_nan = timestamps_detencion[
+        timestamps_detencion
+    ].index
+
+    if len(columnas_a_nan) == 0:
+        return df_historico
+
+    mascara_instrumentos = ~df_historico["Identificador"].isin(
+        controles
+    )
+
+    df_historico.loc[
+        mascara_instrumentos,
+        columnas_a_nan
+    ] = np.nan
+
+    return df_historico
+
 def filtrar_chancado_primario(df_historico):
-
-    print("Soy el chancado primario")
-
-    # Eliminar instrumento no deseado
     df_historico = df_historico[
         df_historico["Identificador"] != 89932
     ]
 
-    # Obtener fila de control chancador primario
-    fila_8954 = df_historico[
-        df_historico["Identificador"] == 8954
-    ].iloc[0]
-
-    # Obtener fila de control correa-01
-    fila_8975 = df_historico[
-        df_historico["Identificador"] == 8975
-    ].iloc[0]
-    #Obtener fila de control del tonelaje de la correa 1
-    fila_9092 = df_historico[
-        df_historico["Identificador"] == 9092
-    ].iloc[0]
-
-    # Quitar columna Identificador
-    control_8954 = fila_8954.drop(labels=["Identificador"])
-    control_8975 = fila_8975.drop(labels=["Identificador"])
-    control_9092 = fila_9092.drop(labels=["Identificador"])
-
-    # Recorrer timestamps
-    for timestamp in control_8954.index:
-
-        valor_8954 = control_8954[timestamp]
-        valor_8975 = control_8975[timestamp]
-        valor_9092 = control_9092[timestamp]
-        # Si cualquiera está detenido
-        if valor_8954 <= 0.5 or valor_8975 <= 0.5 or valor_9092 <= 700:
-            #print(f"En timestamp {timestamp} alguno de los controles está detenido. Marcando como NaN.{valor_8954}, {valor_8975}, {valor_9092}")
-            # No modificar las filas de control
-            mascara = ~df_historico["Identificador"].isin([8954, 8975, 9092])
-            # Poner NaN
-            df_historico.loc[mascara, timestamp] = np.nan
-    """ graficar_instrumento_filtrado(
-        df_historico,
-        8949,
-        "Chancado Primario - Corriente CR-01 - 8949"
-    ) """
-    # Ver porcentaje de datos conservados
-    fila_8949 = df_historico[
-        df_historico["Identificador"] == 8949
-    ]
-
-    if not fila_8949.empty:
-
-        total_timestamps = len(df_historico.columns) - 1
-
-        timestamps_validos = (
-            fila_8949
-            .drop(columns=["Identificador"])
-            .notna()
-            .sum(axis=1)
-            .iloc[0]
+    return aplicar_nan_por_detencion(
+        df_historico=df_historico,
+        controles=[8954, 8975, 9092],
+        condicion_detencion=lambda c: (
+            (c[8954] <= 0.5)
+            | (c[8975] <= 0.5)
+            | (c[9092] <= 700)
         )
-
-        porcentaje = (
-            timestamps_validos
-            / total_timestamps
-            * 100
-        )
-
-        print(
-            f"8949 conserva "
-            f"{timestamps_validos}/{total_timestamps} "
-            f"timestamps ({porcentaje:.2f}%)"
-        )
-    return df_historico
+    )
 
 def filtrar_chancado_secundario(df_historico):
-    print("Soy el chancado secundario")
-
-    # Obtener fila de control correa CR-02
-    fila_8955 = df_historico[
-        df_historico["Identificador"] == 8955
-    ].iloc[0]
-
-    # Obtener fila de control tonelaje / peso
-    fila_9599 = df_historico[
-        df_historico["Identificador"] == 9599
-    ].iloc[0]
-    # Quitar columna Identificador
-    control_8955 = fila_8955.drop(labels=["Identificador"])
-    control_9599 = fila_9599.drop(labels=["Identificador"])
-
-    # Recorrer timestamps
-    for timestamp in control_8955.index:
-
-        valor_8955 = control_8955[timestamp]
-        valor_9599 = control_9599[timestamp]
-
-        # Chancado secundario detenido:
-        # CR-02 distinto de 1 o tonelaje menor/igual a 500
-        if valor_8955 != 1 or valor_9599 <= 500:
-
-            # No modificar las filas de control
-            mascara = ~df_historico["Identificador"].isin([8955, 9599])
-            # Poner NaN
-            df_historico.loc[mascara, timestamp] = np.nan
-    """ graficar_instrumento_filtrado(
-        df_historico,
-        8950,
-        "Chancado Secundario - Corriente CR-02 - 8950"
-    ) """
-    # Ver porcentaje de datos conservados
-    fila_8950 = df_historico[
-        df_historico["Identificador"] == 8950
-    ]
-
-    if not fila_8950.empty:
-
-        total_timestamps = len(df_historico.columns) - 1
-
-        timestamps_validos = (
-            fila_8950
-            .drop(columns=["Identificador"])
-            .notna()
-            .sum(axis=1)
-            .iloc[0]
+    return aplicar_nan_por_detencion(
+        df_historico=df_historico,
+        controles=[8955, 9599],
+        condicion_detencion=lambda c: (
+            (c[8955] != 1)
+            | (c[9599] <= 500)
         )
-
-        porcentaje = (
-            timestamps_validos
-            / total_timestamps
-            * 100
-        )
-
-        print(
-            f"8950 conserva "
-            f"{timestamps_validos}/{total_timestamps} "
-            f"timestamps ({porcentaje:.2f}%)"
-        )
-    return df_historico
+    )
 
 def filtrar_chancado_terciario(df_historico):
-    print("Soy el chancado terciario")
-
-    fila_22258 = df_historico[
-        df_historico["Identificador"] == 22258
-    ].iloc[0]
-
-    fila_9016 = df_historico[
-        df_historico["Identificador"] == 9016
-    ].iloc[0]
-
-    fila_6265 = df_historico[
-        df_historico["Identificador"] == 6265
-    ].iloc[0]
-
-    control_22258 = fila_22258.drop(labels=["Identificador"])
-    control_9016 = fila_9016.drop(labels=["Identificador"])
-    control_6265 = fila_6265.drop(labels=["Identificador"])
-
-    for timestamp in control_22258.index:
-
-        valor_22258 = control_22258[timestamp]
-        valor_9016 = control_9016[timestamp]
-        valor_6265 = control_6265[timestamp]
-
-        if valor_22258 != 1 or valor_9016 != 1 or valor_6265 <= 1000:
-
-            mascara = ~df_historico["Identificador"].isin(
-                [22258, 9016, 6265]
-            )
-
-            df_historico.loc[mascara, timestamp] = np.nan
-    """ graficar_instrumento_filtrado(
-        df_historico,
-        9049,
-        "Chancado Terciario - Corriente PP-01 fijo - 9049"
-    ) """
-    # Ver porcentaje de datos conservados
-    fila_9049 = df_historico[
-        df_historico["Identificador"] == 9049
-    ]
-
-    if not fila_9049.empty:
-
-        total_timestamps = len(df_historico.columns) - 1
-
-        timestamps_validos = (
-            fila_9049
-            .drop(columns=["Identificador"])
-            .notna()
-            .sum(axis=1)
-            .iloc[0]
+    return aplicar_nan_por_detencion(
+        df_historico=df_historico,
+        controles=[22258, 9016, 6265],
+        condicion_detencion=lambda c: (
+            (c[22258] != 1)
+            | (c[9016] != 1)
+            | (c[6265] <= 1000)
         )
+    )
 
-        porcentaje = (
-            timestamps_validos
-            / total_timestamps
-            * 100
-        )
-
-        print(
-            f"9049 conserva "
-            f"{timestamps_validos}/{total_timestamps} "
-            f"timestamps ({porcentaje:.2f}%)"
-        )
-    return df_historico
 
 def filtrar_chancado_cuaternario(df_historico):
-    print("Soy el chancado cuaternario")
-
-    fila_22180 = df_historico[#Rodillo fijo
-        df_historico["Identificador"] == 22180
-    ].iloc[0]
-
-    fila_9017 = df_historico[#Feeder 16
-        df_historico["Identificador"] == 9017
-    ].iloc[0]
-
-    fila_9081 = df_historico[#Tonelaje
-        df_historico["Identificador"] == 9081
-    ].iloc[0]
-
-    control_22180 = fila_22180.drop(labels=["Identificador"])
-    control_9017 = fila_9017.drop(labels=["Identificador"])
-    control_9081 = fila_9081.drop(labels=["Identificador"])
-
-    for timestamp in control_22180.index:
-
-        valor_22180 = control_22180[timestamp]
-        valor_9017 = control_9017[timestamp]
-        valor_9081 = control_9081[timestamp]
-
-        if valor_22180 != 1 or valor_9017 != 1 or valor_9081 <= 1000:
-            mascara = ~df_historico["Identificador"].isin(
-                [22180, 9017, 9081]
-            )
-
-            df_historico.loc[mascara, timestamp] = np.nan
-    """ graficar_instrumento_filtrado(
-        df_historico,
-        9053,
-        "Chancado Cuaternario - Corriente PP-02 fijo - 9053"
-    ) """
-    # Ver porcentaje de datos conservados
-    fila_9053 = df_historico[
-        df_historico["Identificador"] == 9053
-    ]
-
-    if not fila_9053.empty:
-
-        total_timestamps = len(df_historico.columns) - 1
-
-        timestamps_validos = (
-            fila_9053
-            .drop(columns=["Identificador"])
-            .notna()
-            .sum(axis=1)
-            .iloc[0]
+    return aplicar_nan_por_detencion(
+        df_historico=df_historico,
+        controles=[22180, 9017, 9081],
+        condicion_detencion=lambda c: (
+            (c[22180] != 1)
+            | (c[9017] != 1)
+            | (c[9081] <= 1000)
         )
+    )
 
-        porcentaje = (
-            timestamps_validos
-            / total_timestamps
-            * 100
-        )
+BH_09 = 5752
 
-        print(
-            f"9053 conserva "
-            f"{timestamps_validos}/{total_timestamps} "
-            f"timestamps ({porcentaje:.2f}%)"
-        )
-    return df_historico
+CONTROLES_ACOPIO_FINO = {
+    "cv12_run": 8986,
+    "cv12_tonelaje": 9242,
+    "cv13_run": 5756,
+    "tr01_run": 5754,
+    "sk01_run": 9066,
+    "cv14_run": 9144,
+    "cv15_run": 9145,
+    "cv15_tonelaje": 4569,
+    "bh09_run": BH_09,
+}
 
-def filtrar_acopio_fino(df_historico):
-    print("Soy acopio fino")
+FEEDERS_ACOPIO_FINO = [
+    {"sistema": "FE_17", "id_feeder": 9175},
+    {"sistema": "FE_18", "id_feeder": 9176},
+    {"sistema": "FE_19", "id_feeder": 9177},
+    {"sistema": "FE_20", "id_feeder": 9178},
+    {"sistema": "FE_21", "id_feeder": 9179},
+    {"sistema": "FE_22", "id_feeder": 9180},
+    {"sistema": "FE_23", "id_feeder": 9181},
+    {"sistema": "FE_24", "id_feeder": 9182},
+    {"sistema": "FE_25", "id_feeder": 9183},
+    {"sistema": "FE_26", "id_feeder": 9184},
+    {"sistema": "FE_27", "id_feeder": 9185},
+    {"sistema": "FE_28", "id_feeder": 9186},
+    {"sistema": "FE_29", "id_feeder": 9187},
+    {"sistema": "FE_30", "id_feeder": 9188},
+    {"sistema": "FE_31", "id_feeder": 9189},
+    {"sistema": "FE_32", "id_feeder": 9190},
+    {"sistema": "FE_33", "id_feeder": 9191},
+    {"sistema": "FE_34", "id_feeder": 9192},
+    {"sistema": "FE_35", "id_feeder": 9193},
+    {"sistema": "FE_36", "id_feeder": 9194},
+    {"sistema": "FE_37", "id_feeder": 9195},
+    {"sistema": "FE_38", "id_feeder": 9196},
+    {"sistema": "FE_39", "id_feeder": 9197},
+    {"sistema": "FE_40", "id_feeder": 9198},
+    {"sistema": "FE_41", "id_feeder": 9199},
+    {"sistema": "FE_42", "id_feeder": 9200},
+    {"sistema": "FE_43", "id_feeder": 9201},
+]
 
+
+def agregar_sistema_acopio_fino(df_historico):
     df_info = datos_matriz_a()
 
     df_info = df_info[
         df_info["Subarea"] == "Acopio Fino"
     ][["Identificador", "Sistema"]]
 
-    df_historico = df_historico.merge(
+    return df_historico.merge(
         df_info,
         on="Identificador",
         how="left"
     )
 
-    fila_8986 = df_historico[
-        df_historico["Identificador"] == 8986
-    ].iloc[0]  # CV-12
 
-    fila_9242 = df_historico[
-        df_historico["Identificador"] == 9242
-    ].iloc[0]  # Tonelaje CV-12
+def obtener_serie_control_acopio(df_historico, identificador):
+    fila = df_historico[
+        df_historico["Identificador"] == identificador
+    ]
 
-    fila_5756 = df_historico[
-        df_historico["Identificador"] == 5756
-    ].iloc[0]  # CV-13
+    if fila.empty:
+        logger.warning(f"No existe control {identificador} en Acopio Fino")
+        return None
 
-    fila_5754 = df_historico[
-        df_historico["Identificador"] == 5754
-    ].iloc[0]  # TR-01
+    serie = fila.iloc[0].drop(
+        labels=["Identificador", "Sistema"],
+        errors="ignore"
+    )
 
-    fila_9066 = df_historico[
-        df_historico["Identificador"] == 9066
-    ].iloc[0]  # SK-01
+    return pd.to_numeric(
+        serie,
+        errors="coerce"
+    )
 
-    fila_9144 = df_historico[
-        df_historico["Identificador"] == 9144
-    ].iloc[0]  # CV-14
 
-    fila_9145 = df_historico[
-        df_historico["Identificador"] == 9145
-    ].iloc[0]  # CV-15
+def construir_controles_acopio(df_historico):
+    controles = {}
 
-    fila_4569 = df_historico[
-        df_historico["Identificador"] == 4569
-    ].iloc[0]  # Tonelaje CV-15
+    for nombre, identificador in CONTROLES_ACOPIO_FINO.items():
+        serie = obtener_serie_control_acopio(
+            df_historico,
+            identificador
+        )
 
-    control_8986 = fila_8986.drop(labels=["Identificador", "Sistema"])
-    control_9242 = fila_9242.drop(labels=["Identificador", "Sistema"])
-    control_5756 = fila_5756.drop(labels=["Identificador", "Sistema"])
-    control_5754 = fila_5754.drop(labels=["Identificador", "Sistema"])
-    control_9066 = fila_9066.drop(labels=["Identificador", "Sistema"])
-    control_9144 = fila_9144.drop(labels=["Identificador", "Sistema"])
-    control_9145 = fila_9145.drop(labels=["Identificador", "Sistema"])
-    control_4569 = fila_4569.drop(labels=["Identificador", "Sistema"])
+        if serie is None:
+            return None
+
+        controles[nombre] = serie
+
+    return controles
+
+
+def construir_controles_feeders(df_historico):
+    controles_feeders = {}
+
+    for feeder in FEEDERS_ACOPIO_FINO:
+        serie = obtener_serie_control_acopio(
+            df_historico,
+            feeder["id_feeder"]
+        )
+
+        if serie is None:
+            continue
+
+        controles_feeders[feeder["sistema"]] = serie
+
+    return controles_feeders
+
+
+def construir_mascaras_sistema(df_historico):
+    sistemas = [
+        "CV_12",
+        "CV_13",
+        "TR_01",
+        "SK_01",
+        "CV_14",
+        "CV_15",
+    ]
+
+    sistemas += [
+        feeder["sistema"]
+        for feeder in FEEDERS_ACOPIO_FINO
+    ]
+
+    return {
+        sistema: df_historico["Sistema"].eq(sistema)
+        for sistema in sistemas
+    }
+
+def filtrar_acopio_fino(df_historico):
+    df_historico = agregar_sistema_acopio_fino(df_historico)
+
+    controles = construir_controles_acopio(df_historico)
+
+    if controles is None:
+        return df_historico.drop(
+            columns=["Sistema"],
+            errors="ignore"
+        )
+
+    controles_feeders = construir_controles_feeders(df_historico)
+
+    mascaras_sistema = construir_mascaras_sistema(df_historico)
 
     cv14_valor_anterior = 0
     cv14_iteraciones_arranque = 0
@@ -379,16 +292,19 @@ def filtrar_acopio_fino(df_historico):
 
     ventana_arranque_cv14 = 40
     ventana_parada_cv14 = 5
-    for timestamp in control_8986.index:
 
-        valor_8986 = control_8986[timestamp]
-        valor_9242 = control_9242[timestamp]
-        valor_5756 = control_5756[timestamp]
-        valor_5754 = control_5754[timestamp]
-        valor_9066 = control_9066[timestamp]
-        valor_9144 = control_9144[timestamp]
-        valor_9145 = control_9145[timestamp]
-        valor_4569 = control_4569[timestamp]
+    timestamps = controles["cv12_run"].index
+
+    for timestamp in timestamps:
+        valor_8986 = controles["cv12_run"][timestamp]
+        valor_9242 = controles["cv12_tonelaje"][timestamp]
+        valor_5756 = controles["cv13_run"][timestamp]
+        valor_5754 = controles["tr01_run"][timestamp]
+        valor_9066 = controles["sk01_run"][timestamp]
+        valor_9144 = controles["cv14_run"][timestamp]
+        valor_9145 = controles["cv15_run"][timestamp]
+        valor_4569 = controles["cv15_tonelaje"][timestamp]
+        valor_5752 = controles["bh09_run"][timestamp]
 
         cv12_operando = (
             valor_8986 == 1
@@ -410,9 +326,7 @@ def filtrar_acopio_fino(df_historico):
             and valor_9066 == 1
         )
 
-        cv14_operando = (
-            valor_9144 == 1
-        )
+        cv14_operando = valor_9144 == 1
 
         cv15_operando = (
             valor_9145 == 1
@@ -422,54 +336,93 @@ def filtrar_acopio_fino(df_historico):
                 or cv14_operando
             )
         )
+
+        bh09_operando = valor_5752 == 1
+
+        base_feeders_operando = (
+            cv14_operando
+            and cv15_operando
+            and bh09_operando
+        )
+
+        for sistema_feeder, control_feeder in controles_feeders.items():
+            valor_feeder = control_feeder[timestamp]
+
+            feeder_operando = (
+                base_feeders_operando
+                and valor_feeder == 1
+            )
+
+            if not feeder_operando:
+                df_historico.loc[
+                    mascaras_sistema[sistema_feeder],
+                    timestamp
+                ] = np.nan
+
         if not cv12_operando:
-            mascara = df_historico["Sistema"].isin(["CV_12"])
-            df_historico.loc[mascara, timestamp] = np.nan
-            
+            df_historico.loc[
+                mascaras_sistema["CV_12"],
+                timestamp
+            ] = np.nan
 
         if not cv13_operando:
-            mascara = df_historico["Sistema"].isin(["CV_13"])
-            df_historico.loc[mascara, timestamp] = np.nan
+            df_historico.loc[
+                mascaras_sistema["CV_13"],
+                timestamp
+            ] = np.nan
 
         if not tr01_operando:
-            mascara = df_historico["Sistema"].isin(["TR_01"])
-            df_historico.loc[mascara, timestamp] = np.nan
+            df_historico.loc[
+                mascaras_sistema["TR_01"],
+                timestamp
+            ] = np.nan
 
         if not sk01_operando:
-            mascara = df_historico["Sistema"].isin(["SK_01"])
-            df_historico.loc[mascara, timestamp] = np.nan
+            df_historico.loc[
+                mascaras_sistema["SK_01"],
+                timestamp
+            ] = np.nan
 
-
-        # Detectar arranque
         if cv14_valor_anterior != 1 and valor_9144 == 1:
             cv14_iteraciones_arranque = ventana_arranque_cv14
 
-        # Detectar parada
         if cv14_valor_anterior == 1 and valor_9144 != 1:
             cv14_iteraciones_parada = ventana_parada_cv14
 
         if not cv14_operando:
-            mascara = df_historico["Sistema"].isin(["CV_14"])
-            df_historico.loc[mascara, timestamp] = np.nan
+            df_historico.loc[
+                mascaras_sistema["CV_14"],
+                timestamp
+            ] = np.nan
 
         if cv14_iteraciones_arranque > 0:
-            mascara = df_historico["Sistema"].isin(["CV_14"])
-            df_historico.loc[mascara, timestamp] = np.nan
+            df_historico.loc[
+                mascaras_sistema["CV_14"],
+                timestamp
+            ] = np.nan
+
             cv14_iteraciones_arranque -= 1
 
         if cv14_iteraciones_parada > 0:
-            mascara = df_historico["Sistema"].isin(["CV_14"])
-            df_historico.loc[mascara, timestamp] = np.nan
+            df_historico.loc[
+                mascaras_sistema["CV_14"],
+                timestamp
+            ] = np.nan
+
             cv14_iteraciones_parada -= 1
 
         cv14_valor_anterior = valor_9144
 
-
         if not cv15_operando:
-            mascara = df_historico["Sistema"].isin(["CV_15"])
-            df_historico.loc[mascara, timestamp] = np.nan
+            df_historico.loc[
+                mascaras_sistema["CV_15"],
+                timestamp
+            ] = np.nan
 
-    df_historico = df_historico.drop(columns=["Sistema"])
+    df_historico = df_historico.drop(
+        columns=["Sistema"],
+        errors="ignore"
+    )
 
     return df_historico
 

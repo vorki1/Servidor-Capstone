@@ -1,175 +1,144 @@
 from .data_loader import quality_code_metris_api
+
 import asyncio
 import math
+
 import pandas as pd
-from datetime import datetime, timedelta
-from pathlib import Path
 
 from app.core.logger import crear_logger
+
 logger = crear_logger("Pipeline")
 
-def metrics_save(df_metricas):
 
-    logger.info("==== Guardando métricas matriz B =====")
+def redondeo_arriba_abs(x):
+    return math.ceil(x * 100) / 100
 
-    ruta_actual = Path(__file__).resolve()
 
-    ruta_csv = (
-        ruta_actual.parent.parent.parent
-        / "data"
-        / "metricas_matriz_b.csv"
+def calcular_z_score(valor, media, desviacion_estandar):
+    if desviacion_estandar == 0:
+        return 0
+
+    return redondeo_arriba_abs(
+        (valor - media) / desviacion_estandar
     )
 
-    ruta_csv.parent.mkdir(parents=True,exist_ok=True)
-    # =========================
-    # Crear CSV si no existe
-    # =========================
-    if not ruta_csv.exists():
-        df_metricas.to_csv(ruta_csv,index=False)
-        logger.info("CSV creado correctamente")
-        return
-    # =========================
-    # Revisar tiempo modificación
-    # =========================
-    fecha_modificacion = datetime.fromtimestamp(ruta_csv.stat().st_mtime)
-    fecha_actual = datetime.now()
-    diferencia = fecha_actual - fecha_modificacion
-    logger.info(f"Última modificación CSV: {fecha_modificacion} | "f"Ahora: {fecha_actual} | "f"Diferencia: {diferencia}")
 
-    # =========================
-    # No actualizar antes de 1 minuto
-    # =========================
-    if diferencia < timedelta(minutes=1):
-        logger.info("No ha pasado 1 minuto, no se actualiza CSV")
-        return
-    # =========================
-    # Leer CSV actual
-    # =========================
-    df_existente = pd.read_csv(ruta_csv)
-    # =========================
-    # IDs existentes y nuevos
-    # =========================
-    ids_existentes = set(df_existente["Identificador"])
-    ids_nuevos = set(df_metricas["Identificador"])
-    # =========================
-    # Comparaciones
-    # =========================
-    ids_actualizados = ids_existentes.intersection(ids_nuevos)
-    ids_completamente_nuevos = ids_nuevos.difference(ids_existentes)
-    # =========================
-    # Logs métricas actualización
-    # =========================
-    logger.info(f"Sensores existentes en CSV: "f"{len(ids_existentes)}")
-    logger.info(f"Sensores recibidos en iteración: "f"{len(ids_nuevos)}")
-    logger.info(f"Sensores actualizados: "f"{len(ids_actualizados)}")
-    logger.info(f"Sensores nuevos agregados: "f"{len(ids_completamente_nuevos)}")
+async def integracion_quality_code(identificador):
+    try:
+        data = await asyncio.to_thread(
+            quality_code_metris_api,
+            identificador
+        )
 
-    # =========================
-    # Eliminar SOLO esos IDs
-    # =========================
-    df_existente = df_existente[~df_existente["Identificador"].isin(ids_nuevos)]
-    # =========================
-    # Concatenar datos nuevos
-    # =========================
-    df_final = pd.concat([df_existente, df_metricas], ignore_index=True)
+        if not data:
+            return None
 
-    logger.info(f"Total sensores finales: {len(df_final)}")
+        return {
+            "Identificador": identificador,
+            "Quality_code": data[0].get("quality")
+        }
 
-    df_final.to_csv(ruta_csv, index=False)
-
-    logger.info("CSV actualizado correctamente")
-    # =========================
-    
-    return
-def redondeo_arriba_abs(x):#Aux para redondear el z-score
-    return math.ceil(x * 100) / 100
-def calcular_z_score(valor, media, desviacion_estandar): #Aux para calcular z-score
-    if desviacion_estandar == 0:
-        return 0  # Evitar división por cero, si la desviación estándar es cero, el z-score es 0
-    z_score = redondeo_arriba_abs((valor - media) / desviacion_estandar)
-    if abs(z_score) >= 3:
-        pass
-        # activar alerta
-    return z_score
-async def integracion_quality_code(id):
-    data = await quality_code_metris_api(id)
-    if not data:
+    except Exception as e:
+        logger.error(
+            f"Error obteniendo quality code para {identificador}: {e}"
+        )
         return None
-    return {
-        "identificador": id,
-        "Quality_code": data[0]["quality"],
-    }
-async def metricas_de_matrices(df_datos_matriz):#Matriz general para calcular las metricas de cualquier matriz de datos
-    df_datos_matriz = df_datos_matriz.reset_index(drop=True)
-    #=================================Acscendente=========================================
-    cols = df_datos_matriz.columns.drop("Identificador")
-    cols_sorted = sorted(cols)  # ascendente
-    df_datos_matriz = df_datos_matriz[["Identificador"] + cols_sorted]
-    
-    #=====================================================================================
-    df_medidas_estadisticas = pd.DataFrame({
-        "Identificador": pd.Series(dtype="Int64"),  # entero
-        "Media": pd.Series(dtype="float"),
-        "Desviacion_Estandar": pd.Series(dtype="float"),
-    })
 
-    #Identificador como int
-    df_medidas_estadisticas["Identificador"] = (
+
+async def obtener_quality_codes(identificadores):
+    semaphore = asyncio.Semaphore(10)
+
+    async def tarea_limitada(identificador):
+        async with semaphore:
+            return await integracion_quality_code(identificador)
+
+    resultados = await asyncio.gather(
+        *[
+            tarea_limitada(identificador)
+            for identificador in identificadores
+        ]
+    )
+
+    registros = [
+        resultado for resultado in resultados
+        if resultado is not None
+    ]
+
+    if not registros:
+        return pd.DataFrame(
+            columns=["Identificador", "Quality_code"]
+        )
+
+    return pd.DataFrame(registros)
+
+
+async def metricas_de_matrices(df_datos_matriz):
+    if df_datos_matriz.empty:
+        return pd.DataFrame()
+
+    df_datos_matriz = df_datos_matriz.reset_index(drop=True)
+
+    columnas_tiempo = [
+        col for col in df_datos_matriz.columns
+        if col != "Identificador"
+    ]
+
+    columnas_tiempo = sorted(columnas_tiempo)
+
+    if not columnas_tiempo:
+        return pd.DataFrame({
+            "Identificador": (
+                df_datos_matriz["Identificador"]
+                .astype("Int64")
+            ),
+            "Media": None,
+            "Desviacion_Estandar": None,
+            "Quality_code": None,
+            "Gradiente_Max": None,
+            "Gradiente_Intensidad": None,
+        })
+
+    df_datos_matriz = df_datos_matriz[
+        ["Identificador"] + columnas_tiempo
+    ]
+
+    identificadores = (
         df_datos_matriz["Identificador"]
         .astype("Int64")
     )
-    
-    #solo los valores, sin la columna identificador
-    valores = df_datos_matriz.drop(columns=["Identificador"])
-    #================= Quality Code =============================================
-    
-    # =========================
-    # Obtención concurrente
-    # =========================
-    identificadores = df_medidas_estadisticas["Identificador"].to_list()
-    tasks = [#Esto crea ordenes de hacer algo, pero no lo hace aún
-            integracion_quality_code(id)
-            for id in identificadores
-        ]
-    resultados = await asyncio.gather(*tasks, return_exceptions=True)#Esto es el trabajo todo junto y concurrente
-    registros = []
-    for resultado in resultados:
-        if isinstance(resultado, Exception):
-            continue
-        if resultado is None:
-            continue
-        registros.append({
-            "Identificador": resultado["identificador"],
-            "Quality_code": resultado["Quality_code"]
-        })
-    if registros:
-        df_quality = pd.DataFrame(registros)
+
+    valores = df_datos_matriz[columnas_tiempo].apply(
+        pd.to_numeric,
+        errors="coerce"
+    )
+
+    df_medidas_estadisticas = pd.DataFrame({
+        "Identificador": identificadores,
+        "Media": valores.mean(axis=1, skipna=True).round(3),
+        "Desviacion_Estandar": valores.std(axis=1, skipna=True).round(3),
+    })
+
+    df_quality = await obtener_quality_codes(
+        identificadores.dropna().astype(int).tolist()
+    )
+
+    if not df_quality.empty:
         df_medidas_estadisticas = df_medidas_estadisticas.merge(
             df_quality,
             on="Identificador",
             how="left"
         )
-
     else:
-        df_medidas_estadisticas["Quality_Code"] = None
-    #============ Media y Desviación Estándar====================================
-    df_medidas_estadisticas["Media"] = valores.mean(axis=1, skipna=True).round(3)
-    df_medidas_estadisticas["Desviacion_Estandar"] = valores.std(axis=1, skipna=True).round(3)
+        df_medidas_estadisticas["Quality_code"] = None
 
-    #============ Gradiente ====================================================
-    valores_sorted = valores[cols_sorted]  # Datos ordenados, sin la columna identificador
-    valores_sorted = valores_sorted.copy() #Parche para la fragmentacion
-    gradiente = valores_sorted.diff(axis=1)
+    gradiente = valores.diff(axis=1).abs()
 
-    df_gradiente = pd.DataFrame({
-        "Identificador": df_datos_matriz["Identificador"],
-        #"Gradiente_Promedio": gradiente.mean(axis=1, skipna=True).round(3),
-        "Gradiente_Max": gradiente.abs().max(axis=1, skipna=True).round(3),
-        "Gradiente_Intensidad": gradiente.abs().mean(axis=1, skipna=True).round(3),
-    })
-    df_medidas_estadisticas = df_medidas_estadisticas.merge(
-        df_gradiente,
-        on="Identificador",
-        how="left"
+    df_medidas_estadisticas["Gradiente_Max"] = (
+        gradiente.max(axis=1, skipna=True).round(3)
     )
+
+    df_medidas_estadisticas["Gradiente_Intensidad"] = (
+        gradiente.mean(axis=1, skipna=True).round(3)
+    )
+
     return df_medidas_estadisticas

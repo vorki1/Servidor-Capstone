@@ -8,7 +8,7 @@ from app.core.logger import crear_logger
 
 logger = crear_logger("Loop")
 
-ESPERA_ENTRE_CICLOS = 300000
+ESPERA_ENTRE_CICLOS = 300
 
 
 async def loop_pipeline():
@@ -25,7 +25,7 @@ async def loop_pipeline():
                 )
 
             else:
-                #await actualizar_tabla_ultimas_alertas()
+                await actualizar_tabla_ultimas_alertas()
                 pass
 
             fin = datetime.now()

@@ -32,7 +32,7 @@ async def obtener_instrumentos_de_sistema(sistema: str):
 @router.get("/{id}")
 async def info_instrumento(id:int):
     return await informacion_instrumento(id)
-@router.get("/{id}/historico")#Endpoint del historial de tiempo de un instrumento
-async def datos_historicos_por_instrumento(id:int,minutos:int):
-    return await datos_historicos_por_id(id,minutos)
+@router.get("/{id}/historico")
+async def datos_historicos_por_instrumento(id: int, minutos: int):
+    return await datos_historicos_por_id(id, minutos)
 
