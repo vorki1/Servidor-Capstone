@@ -3,11 +3,13 @@ from sqlalchemy.orm import Session
 
 from app.db.dependencies import get_db
 from app.modules.alertas import alerta_service as service
+from app.modules.auth.auth_dependencies import obtener_usuario_actual
 
 
 router = APIRouter(
     prefix="/alertas",
-    tags=["Alertas"]
+    tags=["Alertas"],
+    dependencies=[Depends(obtener_usuario_actual)]
 )
 
 

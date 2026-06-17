@@ -1,29 +1,28 @@
 from .data_loader import quality_code_metris_api
 
 import asyncio
-import math
-
 import pandas as pd
 
 from app.core.logger import crear_logger
 
+
 logger = crear_logger("Pipeline")
 
 
-def redondeo_arriba_abs(x):
-    return math.ceil(x * 100) / 100
+MAX_CONSULTAS_QUALITY_CODE = 10
 
 
-def calcular_z_score(valor, media, desviacion_estandar):
-    if desviacion_estandar == 0:
-        return 0
+COLUMNAS_METRICAS = [
+    "Identificador",
+    "Media",
+    "Desviacion_Estandar",
+    "Quality_code",
+    "Gradiente_Max",
+    "Gradiente_Intensidad",
+]
 
-    return redondeo_arriba_abs(
-        (valor - media) / desviacion_estandar
-    )
 
-
-async def integracion_quality_code(identificador):
+async def obtener_quality_code_instrumento(identificador):
     try:
         data = await asyncio.to_thread(
             quality_code_metris_api,
@@ -46,11 +45,18 @@ async def integracion_quality_code(identificador):
 
 
 async def obtener_quality_codes(identificadores):
-    semaphore = asyncio.Semaphore(10)
+    if not identificadores:
+        return pd.DataFrame(
+            columns=["Identificador", "Quality_code"]
+        )
+
+    semaforo = asyncio.Semaphore(MAX_CONSULTAS_QUALITY_CODE)
 
     async def tarea_limitada(identificador):
-        async with semaphore:
-            return await integracion_quality_code(identificador)
+        async with semaforo:
+            return await obtener_quality_code_instrumento(
+                identificador
+            )
 
     resultados = await asyncio.gather(
         *[
@@ -72,36 +78,33 @@ async def obtener_quality_codes(identificadores):
     return pd.DataFrame(registros)
 
 
-async def metricas_de_matrices(df_datos_matriz):
-    if df_datos_matriz.empty:
-        return pd.DataFrame()
-
-    df_datos_matriz = df_datos_matriz.reset_index(drop=True)
-
+def obtener_columnas_tiempo(df_datos_matriz):
     columnas_tiempo = [
         col for col in df_datos_matriz.columns
         if col != "Identificador"
     ]
 
-    columnas_tiempo = sorted(columnas_tiempo)
+    return sorted(columnas_tiempo)
 
-    if not columnas_tiempo:
-        return pd.DataFrame({
-            "Identificador": (
-                df_datos_matriz["Identificador"]
-                .astype("Int64")
-            ),
-            "Media": None,
-            "Desviacion_Estandar": None,
-            "Quality_code": None,
-            "Gradiente_Max": None,
-            "Gradiente_Intensidad": None,
-        })
 
-    df_datos_matriz = df_datos_matriz[
-        ["Identificador"] + columnas_tiempo
-    ]
+def crear_metricas_vacias(df_datos_matriz):
+    return pd.DataFrame({
+        "Identificador": (
+            df_datos_matriz["Identificador"]
+            .astype("Int64")
+        ),
+        "Media": None,
+        "Desviacion_Estandar": None,
+        "Quality_code": None,
+        "Gradiente_Max": None,
+        "Gradiente_Intensidad": None,
+    })
 
+
+def calcular_metricas_estadisticas(
+    df_datos_matriz,
+    columnas_tiempo
+):
     identificadores = (
         df_datos_matriz["Identificador"]
         .astype("Int64")
@@ -112,33 +115,67 @@ async def metricas_de_matrices(df_datos_matriz):
         errors="coerce"
     )
 
-    df_medidas_estadisticas = pd.DataFrame({
+    gradiente = valores.diff(axis=1).abs()
+
+    df_metricas = pd.DataFrame({
         "Identificador": identificadores,
         "Media": valores.mean(axis=1, skipna=True).round(3),
         "Desviacion_Estandar": valores.std(axis=1, skipna=True).round(3),
+        "Gradiente_Max": gradiente.max(axis=1, skipna=True).round(3),
+        "Gradiente_Intensidad": gradiente.mean(axis=1, skipna=True).round(3),
     })
 
-    df_quality = await obtener_quality_codes(
-        identificadores.dropna().astype(int).tolist()
+    return df_metricas
+
+
+async def agregar_quality_code(df_metricas):
+    identificadores = (
+        df_metricas["Identificador"]
+        .dropna()
+        .astype(int)
+        .drop_duplicates()
+        .tolist()
     )
 
-    if not df_quality.empty:
-        df_medidas_estadisticas = df_medidas_estadisticas.merge(
-            df_quality,
-            on="Identificador",
-            how="left"
-        )
-    else:
-        df_medidas_estadisticas["Quality_code"] = None
+    df_quality = await obtener_quality_codes(identificadores)
 
-    gradiente = valores.diff(axis=1).abs()
+    if df_quality.empty:
+        df_metricas["Quality_code"] = None
+        return df_metricas
 
-    df_medidas_estadisticas["Gradiente_Max"] = (
-        gradiente.max(axis=1, skipna=True).round(3)
+    df_metricas = df_metricas.merge(
+        df_quality,
+        on="Identificador",
+        how="left"
     )
 
-    df_medidas_estadisticas["Gradiente_Intensidad"] = (
-        gradiente.mean(axis=1, skipna=True).round(3)
+    return df_metricas
+
+
+async def metricas_de_matrices(df_datos_matriz):
+    if df_datos_matriz.empty:
+        return pd.DataFrame(columns=COLUMNAS_METRICAS)
+
+    df_datos_matriz = df_datos_matriz.reset_index(drop=True)
+
+    if "Identificador" not in df_datos_matriz.columns:
+        logger.warning("No se pueden calcular métricas: falta Identificador")
+        return pd.DataFrame(columns=COLUMNAS_METRICAS)
+
+    columnas_tiempo = obtener_columnas_tiempo(df_datos_matriz)
+
+    if not columnas_tiempo:
+        return crear_metricas_vacias(df_datos_matriz)
+
+    df_datos_matriz = df_datos_matriz[
+        ["Identificador"] + columnas_tiempo
+    ]
+
+    df_metricas = calcular_metricas_estadisticas(
+        df_datos_matriz,
+        columnas_tiempo
     )
 
-    return df_medidas_estadisticas
+    df_metricas = await agregar_quality_code(df_metricas)
+
+    return df_metricas[COLUMNAS_METRICAS]

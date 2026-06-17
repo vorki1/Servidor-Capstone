@@ -1,7 +1,7 @@
 from app.core.logger import crear_logger
 import pandas as pd
 import numpy as np
-from .data_loader import datos_matriz_a
+from .matriz_a import datos_matriz_a
 import matplotlib.pyplot as plt
 
 logger = crear_logger("Pipeline")

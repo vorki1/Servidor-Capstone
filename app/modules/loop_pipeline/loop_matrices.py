@@ -6,9 +6,11 @@ import asyncio
 
 from app.core.logger import crear_logger
 
+
 logger = crear_logger("Loop")
 
-ESPERA_ENTRE_CICLOS = 300
+
+ESPERA_ACTUALIZAR_ALERTAS = 6000
 
 
 async def loop_pipeline():
@@ -20,24 +22,23 @@ async def loop_pipeline():
 
             if pipeline_state.MATRIZ_B_EN_PROCESO:
                 logger.info(
-                    "Matriz B en proceso. Se omite actualización dinámica."
+                    "Matriz B en proceso. Se omite actualización de alertas."
                 )
-
             else:
                 await actualizar_tabla_ultimas_alertas()
-                pass
 
             fin = datetime.now()
             duracion = (fin - inicio).total_seconds()
 
-            logger.info(f"Duración ciclo: {duracion:.2f} segundos")
-            logger.info("===== Fin ciclo pipeline =====")
+            logger.info(
+                f"===== Ciclo pipeline finalizado en {duracion:.2f} segundos ====="
+            )
 
         except Exception as e:
             logger.error(f"Error pipeline: {e}")
 
         logger.info(
-            f"Esperando {ESPERA_ENTRE_CICLOS} segundos antes del próximo ciclo"
+            f"Esperando {ESPERA_ACTUALIZAR_ALERTAS} segundos antes del próximo ciclo"
         )
 
-        await asyncio.sleep(ESPERA_ENTRE_CICLOS)
+        await asyncio.sleep(ESPERA_ACTUALIZAR_ALERTAS)

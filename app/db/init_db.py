@@ -1,6 +1,7 @@
 from app.db.database import Base, engine
 
 # importar todos los modelos
+from app.modules.auth.auth_model import Usuario
 from app.modules.alertas.alerta_model import AlertaInstrumento
 
 def create_tables():

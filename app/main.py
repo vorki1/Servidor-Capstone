@@ -1,49 +1,51 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+import asyncio
+
+from app.db.init_db import create_tables
+from app.db.database import SessionLocal
+
+from app.modules.auth.auth_seed import crear_usuarios_iniciales
+
 from .modules.instrumento.instrumento_router import router as instrumento_router
 from .modules.pipeline.pipeline_router import router as pipeline_router
 from .modules.alertas.alerta_router import router as alerta_router
-from .modules.admin.admin_router import router as admin_router
+from .modules.auth.auth_router import router as auth_router
+from app.modules.pipeline.pipeline_service import inicializar_archivos_pipeline
 from .modules.loop_pipeline.loop_matrices import loop_pipeline
-from fastapi.middleware.cors import CORSMiddleware
-from app.db.init_db import create_tables
-from contextlib import asynccontextmanager
-import asyncio
-import threading
-
-
-def iniciar_loop_pipeline():
-    asyncio.run(loop_pipeline())
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_tables()
 
-    thread_pipeline = threading.Thread(
-        target=iniciar_loop_pipeline,
-        daemon=True
-    )
-    thread_pipeline.start()
+    db = SessionLocal()
+
+    try:
+        crear_usuarios_iniciales(db)
+    finally:
+        db.close()
+    await inicializar_archivos_pipeline()
+    asyncio.create_task(loop_pipeline())
 
     yield
 
 
 app = FastAPI(lifespan=lifespan)
 
-app.include_router(instrumento_router)
-app.include_router(pipeline_router)
-app.include_router(alerta_router)
-app.include_router(admin_router)
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-@app.get("/")
-def root():
-    return {"mensaje": "API funcionando correctamente"}
+app.include_router(auth_router)
+app.include_router(instrumento_router)
+app.include_router(pipeline_router)
+app.include_router(alerta_router)

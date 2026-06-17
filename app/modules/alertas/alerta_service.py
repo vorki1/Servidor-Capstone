@@ -48,7 +48,8 @@ def listar_alertas(
 ):
     if page < 1:
         page = 1
-
+    if limit < 1:
+        limit = 100
     if limit > 500:
         limit = 500
 

@@ -13,6 +13,9 @@ RUTA_DATA_MATRIZ_C = DATA_DIR / "data_matriz_c.csv"
 def guardar_metricas_matriz_b(df_metricas):
     RUTA_METRICAS_MATRIZ_B.parent.mkdir(parents=True, exist_ok=True)
 
+    if df_metricas.empty:
+        return
+
     if not RUTA_METRICAS_MATRIZ_B.exists():
         df_metricas.to_csv(RUTA_METRICAS_MATRIZ_B, index=False)
         return
@@ -41,16 +44,27 @@ def guardar_metricas_matriz_b(df_metricas):
 
 
 def leer_metricas_matriz_b():
+    if not RUTA_METRICAS_MATRIZ_B.exists():
+        return pd.DataFrame()
+
     return pd.read_csv(RUTA_METRICAS_MATRIZ_B)
 
 
 def guardar_datos_matriz_c(df_data):
     RUTA_DATA_MATRIZ_C.parent.mkdir(parents=True, exist_ok=True)
+
+    if df_data.empty:
+        return
+
     df_data.to_csv(RUTA_DATA_MATRIZ_C, index=False)
 
 
 def leer_datos_matriz_c():
+    if not RUTA_DATA_MATRIZ_C.exists():
+        return pd.DataFrame()
+
     return pd.read_csv(RUTA_DATA_MATRIZ_C)
+
 
 def obtener_fecha_actualizacion_metricas_matriz_b():
     if not RUTA_METRICAS_MATRIZ_B.exists():

@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from .instrumento_service import (historico_instrumento,
                                   areas_unicas,
                                   subareas_de_area,
@@ -7,10 +7,12 @@ from .instrumento_service import (historico_instrumento,
                                   sistemas_por_subarea,
                                   instrumentos_por_sistema
                                   )
+from app.modules.auth.auth_dependencies import obtener_usuario_actual
 
 router = APIRouter(
     prefix="/instrumento",
-    tags=["instrumento"]
+    tags=["instrumento"],
+    dependencies=[Depends(obtener_usuario_actual)]
 )
 
 @router.get("/datos")

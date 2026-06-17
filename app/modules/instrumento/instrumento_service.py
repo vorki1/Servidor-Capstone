@@ -6,10 +6,10 @@ import pandas as pd
 from .historian_debug import historico_instrumento_metris_api
 
 from ..pipeline.data_loader import (
-    datos_matriz_a,
     datos_historicos_por_instrumento,
     tiempo_actual
 )
+from ..pipeline.matriz_a import datos_matriz_a
 
 
 def historico_instrumento():

@@ -1,19 +1,19 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from threading import Thread
 import asyncio
 
 from . import pipeline_state
 from .pipeline_service import (
     matriz_b,
-    matriz_datos_c,
     actualizar_tabla_ultimas_alertas,
 )
 from .storage import obtener_fecha_actualizacion_metricas_matriz_b
-
+from app.modules.auth.auth_dependencies import requiere_admin
 
 router = APIRouter(
     prefix="/matriz",
-    tags=["matriz"]
+    tags=["matriz"],
+    dependencies=[Depends(requiere_admin)]
 )
 
 
@@ -55,12 +55,6 @@ async def estado_matriz_b():
 async def obtener_fecha_actualizacion_matriz_base():
     return obtener_fecha_actualizacion_metricas_matriz_b()
 
-
-@router.get("/matriz-c")
-async def construccion_matriz_c():
-    data = await matriz_datos_c()
-    return data.to_dict(orient="records")
-
-@router.get("/actualizar-tabla-alertas-activas")
+@router.get("/actualizar-tabla-alertas-activas")#Endpoint que hay que eliminar (Esta en el loop de pipeline)
 async def alertas_instrumentos():
     return await actualizar_tabla_ultimas_alertas()

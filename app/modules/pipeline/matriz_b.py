@@ -22,7 +22,9 @@ from app.core.logger import crear_logger
 
 logger = crear_logger("Pipeline")
 
-
+DIAS_HISTORICO_MATRIZ_B = 15
+PERIODO_MUESTREO_MATRIZ_B = 1
+MAX_SUBAREAS_CONCURRENTES = 2
 SUBAREAS_MATRIZ_B = [
     subarea_chancado_primario,
     subarea_chancado_secundario,
@@ -81,17 +83,16 @@ async def procesar_subarea_matriz_b(
 
 async def construccion_datos_matriz_b():
     fecha_fin = tiempo_actual()
-    fecha_inicio = fecha_fin - relativedelta(days=15)
+    fecha_inicio = fecha_fin - relativedelta(days=DIAS_HISTORICO_MATRIZ_B)
 
-    periodo_muestreo_matriz_b = 1
-    semaforo = asyncio.Semaphore(2)
+    semaforo = asyncio.Semaphore(MAX_SUBAREAS_CONCURRENTES)
 
     tareas = [
         procesar_subarea_matriz_b(
             obtener_subarea=obtener_subarea,
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            periodo_muestreo_matriz_b=periodo_muestreo_matriz_b,
+            periodo_muestreo_matriz_b=PERIODO_MUESTREO_MATRIZ_B,
             semaforo=semaforo
         )
         for obtener_subarea in SUBAREAS_MATRIZ_B
@@ -124,21 +125,6 @@ async def construccion_datos_matriz_b():
     return df_matriz_b_final
 
 
-def analizar_metricas_matriz_b(df_metricas):
-    total = len(df_metricas)
-
-    df_sospechosos = df_metricas[
-        df_metricas["Media"].isna()
-        | (df_metricas["Media"] == 0)
-        | df_metricas["Desviacion_Estandar"].isna()
-        | (df_metricas["Desviacion_Estandar"] == 0)
-    ]
-
-    logger.info(
-        f"Matriz B métricas | Total: {total} | Sospechosos: {len(df_sospechosos)}"
-    )
-
-
 async def construccion_matriz_b():
     async with matriz_b_lock:
         t0 = perf_counter()
@@ -153,7 +139,9 @@ async def construccion_matriz_b():
             df_datos_matriz_b
         )
 
-        analizar_metricas_matriz_b(df_medidas_estadisticas)
+        if df_medidas_estadisticas.empty:
+            logger.warning("No se calcularon métricas para Matriz B")
+            return "No se calcularon métricas para Matriz B"
 
         guardar_metricas_matriz_b(df_medidas_estadisticas)
 

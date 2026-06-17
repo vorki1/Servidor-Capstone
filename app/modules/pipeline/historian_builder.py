@@ -1,17 +1,21 @@
+from datetime import datetime, timezone
+import asyncio
+
+import pandas as pd
+
 from .data_loader import (
     datos_historicos_por_instrumento,
     ultimo_valor_interpolado_por_instrumento
 )
 
 from .filtros_iniciales import eliminar_booleanos
-
-import pandas as pd
-from datetime import datetime
-import asyncio
-
 from app.core.logger import crear_logger
 
+
 logger = crear_logger("Pipeline")
+
+
+MAX_CONSULTAS_HISTORIAN = 10
 
 
 async def obtener_historico(
@@ -43,19 +47,17 @@ async def obtener_historico(
         return None
 
 
-async def generar_dataframe_datos_historicos(
-    df_matriz,
+async def obtener_historicos_limitados(
+    identificadores,
     fecha_inicio,
     fecha_fin,
     minutos_muestreo,
     segundos_muestreo
 ):
-    identificadores = df_matriz["Identificador"].tolist()
+    semaforo = asyncio.Semaphore(MAX_CONSULTAS_HISTORIAN)
 
-    semaphore = asyncio.Semaphore(10)
-
-    async def obtener_historico_limitado(identificador):
-        async with semaphore:
+    async def tarea_limitada(identificador):
+        async with semaforo:
             return await obtener_historico(
                 identificador,
                 fecha_inicio,
@@ -64,15 +66,17 @@ async def generar_dataframe_datos_historicos(
                 segundos_muestreo
             )
 
-    tasks = [
-        obtener_historico_limitado(id)
-        for id in identificadores
+    tareas = [
+        tarea_limitada(identificador)
+        for identificador in identificadores
     ]
 
-    resultados = await asyncio.gather(*tasks)
+    return await asyncio.gather(*tareas)
 
+
+def convertir_historicos_a_dataframe(resultados):
     registros = []
-    
+
     for resultado in resultados:
         if resultado is None:
             continue
@@ -94,8 +98,13 @@ async def generar_dataframe_datos_historicos(
                 )
             })
 
-    df_historicos = pd.DataFrame(registros)
+    if not registros:
+        return pd.DataFrame(columns=["Identificador"])
 
+    return pd.DataFrame(registros)
+
+
+def pivotear_historicos(df_historicos):
     if df_historicos.empty:
         return pd.DataFrame(columns=["Identificador"])
 
@@ -122,6 +131,95 @@ async def generar_dataframe_datos_historicos(
     return df_matriz_datos
 
 
+async def generar_dataframe_datos_historicos(
+    df_matriz,
+    fecha_inicio,
+    fecha_fin,
+    minutos_muestreo,
+    segundos_muestreo
+):
+    if df_matriz.empty or "Identificador" not in df_matriz.columns:
+        return pd.DataFrame(columns=["Identificador"])
+
+    identificadores = (
+        df_matriz["Identificador"]
+        .dropna()
+        .astype(int)
+        .drop_duplicates()
+        .tolist()
+    )
+
+    if not identificadores:
+        return pd.DataFrame(columns=["Identificador"])
+
+    resultados = await obtener_historicos_limitados(
+        identificadores,
+        fecha_inicio,
+        fecha_fin,
+        minutos_muestreo,
+        segundos_muestreo
+    )
+
+    df_historicos = convertir_historicos_a_dataframe(resultados)
+
+    return pivotear_historicos(df_historicos)
+
+
+async def obtener_ultimo_valor(
+    identificador,
+    fecha_inicio,
+    fecha_fin,
+    minutos_muestreo,
+    segundos_muestreo
+):
+    try:
+        resultado = await asyncio.to_thread(
+            ultimo_valor_interpolado_por_instrumento,
+            identificador,
+            fecha_inicio,
+            fecha_fin,
+            minutos_muestreo,
+            segundos_muestreo
+        )
+
+        return {
+            "identificador": identificador,
+            "resultado": resultado
+        }
+
+    except Exception as e:
+        logger.error(f"Error en instrumento {identificador}: {e}")
+        return {
+            "identificador": identificador,
+            "resultado": None
+        }
+
+async def obtener_ultimos_valores_limitados(
+    identificadores,
+    fecha_inicio,
+    fecha_fin,
+    minutos_muestreo,
+    segundos_muestreo
+):
+    semaforo = asyncio.Semaphore(MAX_CONSULTAS_HISTORIAN)
+
+    async def tarea_limitada(identificador):
+        async with semaforo:
+            return await obtener_ultimo_valor(
+                identificador,
+                fecha_inicio,
+                fecha_fin,
+                minutos_muestreo,
+                segundos_muestreo
+            )
+
+    tareas = [
+        tarea_limitada(identificador)
+        for identificador in identificadores
+    ]
+
+    return await asyncio.gather(*tareas)
+
 async def generar_dataframe_ultima_columna(
     df_identificadores,
     fecha_inicio,
@@ -129,50 +227,44 @@ async def generar_dataframe_ultima_columna(
     minutos_muestreo,
     segundos_muestreo
 ):
-    identificadores = df_identificadores.tolist()
+    identificadores = (
+        pd.Series(df_identificadores)
+        .dropna()
+        .astype(int)
+        .drop_duplicates()
+        .tolist()
+    )
+
+    if not identificadores:
+        return pd.DataFrame(columns=["Identificador"])
 
     timestamp_global = (
-        datetime.now()
+        datetime.now(timezone.utc)
         .replace(microsecond=0)
-        .astimezone()
         .isoformat()
     )
 
-    tasks = [
-        asyncio.to_thread(
-            ultimo_valor_interpolado_por_instrumento,
-            id,
-            fecha_inicio,
-            fecha_fin,
-            minutos_muestreo,
-            segundos_muestreo
-        )
-        for id in identificadores
-    ]
-
-    resultados = await asyncio.gather(
-        *tasks,
-        return_exceptions=True
+    resultados = await obtener_ultimos_valores_limitados(
+        identificadores,
+        fecha_inicio,
+        fecha_fin,
+        minutos_muestreo,
+        segundos_muestreo
     )
 
     registros = []
 
-    for id, resultado in zip(identificadores, resultados):
-        if isinstance(resultado, Exception):
-            logger.error(f"Error en instrumento {id}: {resultado}")
-            continue
+    for resultado in resultados:
+        identificador = resultado["identificador"]
+        punto = resultado["resultado"]
 
-        if resultado is None:
-            logger.warning(f"Sin datos para instrumento {id}")
+        if punto is None:
+            logger.warning(f"Sin datos para instrumento {identificador}")
             continue
-
-        valor = resultado.get("y")
 
         registros.append({
-            "Identificador": id,
-            timestamp_global: valor
+            "Identificador": identificador,
+            timestamp_global: punto.get("y")
         })
 
-    df_ultima_columna = pd.DataFrame(registros)
-
-    return df_ultima_columna
+    return pd.DataFrame(registros)
