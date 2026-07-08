@@ -8,12 +8,10 @@ from .pipeline_service import (
     actualizar_tabla_ultimas_alertas,
 )
 from .storage import obtener_fecha_actualizacion_metricas_matriz_b
-from app.modules.auth.auth_dependencies import requiere_admin
 
 router = APIRouter(
     prefix="/matriz",
     tags=["matriz"],
-    dependencies=[Depends(requiere_admin)]
 )
 
 

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from app.core.logger import crear_logger
+from app.modules.instrumento.instrumento_service import datos_matriz_a
 
 logger = crear_logger("Alertas")
 
@@ -15,6 +16,272 @@ COLUMNAS_ALERTAS = [
     "Alerta_Senal_Recuperada",
 ]
 
+UMBRALES_DELTA_CAMBIO_BRUSCO = {
+    "TEMPERATURA": {
+        "PREVENTIVO": 5,
+        "CRITICO": 15,
+        "EMERGENCIA": 30,
+    },
+    "CORRIENTE": {
+        "PREVENTIVO": 15,
+        "CRITICO": 40,
+        "EMERGENCIA": 80,
+    },
+    "PORCENTAJE": {
+        "PREVENTIVO": 10,
+        "CRITICO": 25,
+        "EMERGENCIA": 50,
+    },
+    "PRESION": {
+        "PREVENTIVO": 5,
+        "CRITICO": 15,
+        "EMERGENCIA": 30,
+    },
+    "VELOCIDAD": {
+        "PREVENTIVO": 0.5,
+        "CRITICO": 1.5,
+        "EMERGENCIA": 3,
+    },
+    "RPM": {
+        "PREVENTIVO": 10,
+        "CRITICO": 30,
+        "EMERGENCIA": 60,
+    },
+    "MM/S": {
+        "PREVENTIVO": 0.2,
+        "CRITICO": 0.5,
+        "EMERGENCIA": 1,
+    },
+    "TONELAJE": {
+        "PREVENTIVO": 100,
+        "CRITICO": 300,
+        "EMERGENCIA": 600,
+    },
+    "POTENCIA": {
+        "PREVENTIVO": 50,
+        "CRITICO": 150,
+        "EMERGENCIA": 300,
+    },
+    "DEFAULT": {
+        "PREVENTIVO": 5,
+        "CRITICO": 15,
+        "EMERGENCIA": 30,
+    },
+}
+
+
+UMBRALES_DELTA_OSCILACION = {
+    "TEMPERATURA": {
+        "PREVENTIVO": 2,
+        "CRITICO": 5,
+        "EMERGENCIA": 10,
+    },
+    "CORRIENTE": {
+        "PREVENTIVO": 3,
+        "CRITICO": 8,
+        "EMERGENCIA": 15,
+    },
+    "PORCENTAJE": {
+        "PREVENTIVO": 3,
+        "CRITICO": 8,
+        "EMERGENCIA": 15,
+    },
+    "PRESION": {
+        "PREVENTIVO": 1,
+        "CRITICO": 3,
+        "EMERGENCIA": 6,
+    },
+    "VELOCIDAD": {
+        "PREVENTIVO": 0.2,
+        "CRITICO": 0.5,
+        "EMERGENCIA": 1,
+    },
+    "RPM": {
+        "PREVENTIVO": 1,
+        "CRITICO": 3,
+        "EMERGENCIA": 6,
+    },
+    "MM/S": {
+        "PREVENTIVO": 0.05,
+        "CRITICO": 0.2,
+        "EMERGENCIA": 0.5,
+    },
+    "TONELAJE": {
+        "PREVENTIVO": 20,
+        "CRITICO": 50,
+        "EMERGENCIA": 100,
+    },
+    "POTENCIA": {
+        "PREVENTIVO": 20,
+        "CRITICO": 50,
+        "EMERGENCIA": 100,
+    },
+    "DEFAULT": {
+        "PREVENTIVO": 0.5,
+        "CRITICO": 2,
+        "EMERGENCIA": 5,
+    },
+}
+
+def obtener_umbral_delta(unidad_normalizada, tipo_alerta, nivel):
+    if tipo_alerta == "CAMBIO_BRUSCO":
+        umbrales = UMBRALES_DELTA_CAMBIO_BRUSCO
+    elif tipo_alerta == "OSCILACION":
+        umbrales = UMBRALES_DELTA_OSCILACION
+    else:
+        return None
+
+    return umbrales.get(
+        unidad_normalizada,
+        umbrales["DEFAULT"]
+    )[nivel]
+
+def normalizar_unidad(unidad):
+    if pd.isna(unidad):
+        return "SIN_UNIDAD"
+
+    unidad = str(unidad).strip().lower()
+
+    equivalencias = {
+        "°c": "TEMPERATURA",
+        "c": "TEMPERATURA",
+        "degc": "TEMPERATURA",
+        "%": "PORCENTAJE",
+        "porcentaje": "PORCENTAJE",
+        "amp": "CORRIENTE",
+        "a": "CORRIENTE",
+        "rpm": "RPM",
+        "m/s": "VELOCIDAD",
+        "m/seg": "VELOCIDAD",
+        "kw": "POTENCIA",
+        "bar": "PRESION",
+        "psi": "PRESION",
+        "kpa": "PRESION",
+        "pa": "PRESION",
+        "ton": "TONELAJE",
+        "vacio": "SIN_UNIDAD",
+        "": "SIN_UNIDAD",
+    }
+
+    return equivalencias.get(unidad, unidad.upper())
+
+
+def agregar_unidad_ingenieria(df_merge):
+    df_matriz_a = datos_matriz_a()
+
+    if "Unidad_de_Ingenieria" not in df_matriz_a.columns:
+        logger.warning("Matriz A no contiene Unidad_de_Ingenieria")
+        df_merge["Unidad_de_Ingenieria"] = None
+        df_merge["Unidad_Normalizada"] = "SIN_UNIDAD"
+        return df_merge
+
+    df_unidades = (
+        df_matriz_a[["Identificador", "Unidad_de_Ingenieria"]]
+        .drop_duplicates(subset=["Identificador"])
+    )
+
+    df_merge = df_merge.merge(
+        df_unidades,
+        on="Identificador",
+        how="left"
+    )
+
+    df_merge["Unidad_Normalizada"] = (
+        df_merge["Unidad_de_Ingenieria"]
+        .apply(normalizar_unidad)
+    )
+
+    return df_merge
+
+
+def guardar_reporte_unidades(df_merge):
+    if "Unidad_de_Ingenieria" not in df_merge.columns:
+        logger.warning("No existe Unidad_de_Ingenieria en df_merge")
+        return
+
+    df_reporte = df_merge.copy()
+
+    df_reporte["Unidad_Normalizada"] = (
+        df_reporte["Unidad_de_Ingenieria"]
+        .apply(normalizar_unidad)
+    )
+
+    resumen = (
+        df_reporte
+        .groupby("Unidad_Normalizada")
+        .agg(
+            total=("Identificador", "count"),
+            alertas_cambio_brusco=(
+                "Alerta_Cambio_Brusco",
+                lambda x: (x != "NORMAL").sum()
+            ),
+            alertas_oscilacion=(
+                "Alerta_Oscilacion",
+                lambda x: (x != "NORMAL").sum()
+            ),
+            promedio_delta_gradiente=("Delta_Gradiente", "mean"),
+            max_delta_gradiente=("Delta_Gradiente", "max"),
+            promedio_delta_oscilacion=("Delta_Oscilacion", "mean"),
+            max_delta_oscilacion=("Delta_Oscilacion", "max"),
+            max_ratio_gradiente=("Ratio_Gradiente", "max"),
+            max_ratio_oscilacion=("Ratio_Oscilacion", "max"),
+        )
+        .reset_index()
+        .sort_values(by="total", ascending=False)
+    )
+
+    resumen.to_csv(
+        "reporte_unidades.csv",
+        index=False,
+        encoding="utf-8-sig"
+    )
+
+
+def guardar_candidatos_alertas(df_merge):
+    if "Unidad_de_Ingenieria" not in df_merge.columns:
+        logger.warning("No existe Unidad_de_Ingenieria para candidatos")
+        return
+
+    df_reporte = df_merge.copy()
+
+    df_reporte["Unidad_Normalizada"] = (
+        df_reporte["Unidad_de_Ingenieria"]
+        .apply(normalizar_unidad)
+    )
+
+    columnas = [
+        "Identificador",
+        "Unidad_de_Ingenieria",
+        "Unidad_Normalizada",
+
+        "Desviacion_Estandar_b",
+        "Desviacion_Estandar_c",
+        "Delta_STD",
+        "Ratio_STD",
+
+        "Gradiente_Max_b",
+        "Gradiente_Max_c",
+        "Delta_Gradiente",
+        "Ratio_Gradiente",
+        "Alerta_Cambio_Brusco",
+
+        "Gradiente_Intensidad_b",
+        "Gradiente_Intensidad_c",
+        "Delta_Oscilacion",
+        "Ratio_Oscilacion",
+        "Alerta_Oscilacion",
+    ]
+
+    columnas_existentes = [
+        col for col in columnas
+        if col in df_reporte.columns
+    ]
+
+    df_reporte[columnas_existentes].to_csv(
+        "candidatos_alertas.csv",
+        index=False,
+        encoding="utf-8-sig"
+    )
 
 def detectar_todos_cero(df):
     df["Alerta_Todos_Cero"] = "NORMAL"
@@ -30,7 +297,7 @@ def detectar_todos_cero(df):
         & (df["Gradiente_Intensidad_c"] == 0)
     )
 
-    df.loc[condicion, "Alerta_Todos_Cero"] = "CRITICO"
+    df.loc[condicion, "Alerta_Todos_Cero"] = "PREVENTIVO"
 
     return df
 
@@ -67,30 +334,66 @@ def detectar_cambio_brusco(df):
         / (df["Desviacion_Estandar_b"] + epsilon)
     ).round(3)
 
+    df["Delta_STD"] = (
+        df["Desviacion_Estandar_c"]
+        - df["Desviacion_Estandar_b"]
+    ).abs().round(3)
+
     df["Ratio_Gradiente"] = (
         df["Gradiente_Max_c"]
         / (df["Gradiente_Max_b"] + epsilon)
     ).round(3)
 
+    df["Delta_Gradiente"] = (
+        df["Gradiente_Max_c"]
+        - df["Gradiente_Max_b"]
+    ).abs().round(3)
+
     df["Alerta_Cambio_Brusco"] = "NORMAL"
 
+    df["Delta_Min_Cambio_Preventivo"] = df["Unidad_Normalizada"].apply(
+        lambda unidad: obtener_umbral_delta(
+            unidad,
+            "CAMBIO_BRUSCO",
+            "PREVENTIVO"
+        )
+    )
+
+    df["Delta_Min_Cambio_Critico"] = df["Unidad_Normalizada"].apply(
+        lambda unidad: obtener_umbral_delta(
+            unidad,
+            "CAMBIO_BRUSCO",
+            "CRITICO"
+        )
+    )
+
+    df["Delta_Min_Cambio_Emergencia"] = df["Unidad_Normalizada"].apply(
+        lambda unidad: obtener_umbral_delta(
+            unidad,
+            "CAMBIO_BRUSCO",
+            "EMERGENCIA"
+        )
+    )
+
     df.loc[
-        (df["Ratio_STD"] >= 2) | (df["Ratio_Gradiente"] >= 2),
+        (df["Ratio_Gradiente"] >= 2)
+        & (df["Delta_Gradiente"] >= df["Delta_Min_Cambio_Preventivo"]),
         "Alerta_Cambio_Brusco"
     ] = "PREVENTIVO"
 
     df.loc[
-        (df["Ratio_STD"] >= 5) | (df["Ratio_Gradiente"] >= 5),
+        (df["Ratio_Gradiente"] >= 5)
+        & (df["Delta_Gradiente"] >= df["Delta_Min_Cambio_Critico"]),
         "Alerta_Cambio_Brusco"
     ] = "CRITICO"
 
     df.loc[
-        (df["Ratio_STD"] >= 10) | (df["Ratio_Gradiente"] >= 10),
+        (df["Ratio_Gradiente"] >= 10)
+        & (df["Delta_Gradiente"] >= df["Delta_Min_Cambio_Emergencia"]),
         "Alerta_Cambio_Brusco"
     ] = "EMERGENCIA"
 
     return df
-
 
 def detectar_oscilacion(df):
     epsilon = 1e-6
@@ -100,20 +403,52 @@ def detectar_oscilacion(df):
         / (df["Gradiente_Intensidad_b"] + epsilon)
     ).round(3)
 
+    df["Delta_Oscilacion"] = (
+        df["Gradiente_Intensidad_c"]
+        - df["Gradiente_Intensidad_b"]
+    ).abs().round(3)
+
     df["Alerta_Oscilacion"] = "NORMAL"
 
+    df["Delta_Min_Osc_Preventivo"] = df["Unidad_Normalizada"].apply(
+        lambda unidad: obtener_umbral_delta(
+            unidad,
+            "OSCILACION",
+            "PREVENTIVO"
+        )
+    )
+
+    df["Delta_Min_Osc_Critico"] = df["Unidad_Normalizada"].apply(
+        lambda unidad: obtener_umbral_delta(
+            unidad,
+            "OSCILACION",
+            "CRITICO"
+        )
+    )
+
+    df["Delta_Min_Osc_Emergencia"] = df["Unidad_Normalizada"].apply(
+        lambda unidad: obtener_umbral_delta(
+            unidad,
+            "OSCILACION",
+            "EMERGENCIA"
+        )
+    )
+
     df.loc[
-        df["Ratio_Oscilacion"] >= 2,
+        (df["Ratio_Oscilacion"] >= 3)
+        & (df["Delta_Oscilacion"] >= df["Delta_Min_Osc_Preventivo"]),
         "Alerta_Oscilacion"
     ] = "PREVENTIVO"
 
     df.loc[
-        df["Ratio_Oscilacion"] >= 5,
+        (df["Ratio_Oscilacion"] >= 6)
+        & (df["Delta_Oscilacion"] >= df["Delta_Min_Osc_Critico"]),
         "Alerta_Oscilacion"
     ] = "CRITICO"
 
     df.loc[
-        df["Ratio_Oscilacion"] >= 10,
+        (df["Ratio_Oscilacion"] >= 12)
+        & (df["Delta_Oscilacion"] >= df["Delta_Min_Osc_Emergencia"]),
         "Alerta_Oscilacion"
     ] = "EMERGENCIA"
 
@@ -129,7 +464,7 @@ def detectar_sensor_congelado(df):
         & (df["Gradiente_Intensidad_c"] <= 0.001)
     )
 
-    df.loc[condicion, "Alerta_Senal_Congelada"] = "CRITICO"
+    df.loc[condicion, "Alerta_Senal_Congelada"] = "PREVENTIVO"
 
     return df
 
@@ -189,12 +524,17 @@ def tabla_alertas(df_matriz_b, df_matriz_c):
         logger.warning("No hay coincidencias entre Matriz B y Matriz C")
         return pd.DataFrame()
 
+    df_merge = agregar_unidad_ingenieria(df_merge)
+
     df_merge = detectar_cambio_brusco(df_merge)
     df_merge = detectar_oscilacion(df_merge)
     df_merge = detectar_sensor_congelado(df_merge)
     df_merge = detectar_todos_cero(df_merge)
     df_merge = detectar_media_congelada(df_merge)
     df_merge = detectar_senal_recuperada(df_merge)
+
+    guardar_reporte_unidades(df_merge)
+    guardar_candidatos_alertas(df_merge)
 
     df_merge = df_merge.replace({np.nan: None})
 

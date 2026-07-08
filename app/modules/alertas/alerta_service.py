@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
 import math
+
 from sqlalchemy import func
-from app.modules.instrumento.instrumento_service import datos_matriz_a
 from sqlalchemy.orm import Session
+
+from app.modules.instrumento.instrumento_service import datos_matriz_a
 from app.modules.alertas.alerta_model import AlertaInstrumento
 from app.modules.alertas import alerta_repository as repo
 from .alerta_constants import TIPOS_ALERTA
@@ -48,8 +50,10 @@ def listar_alertas(
 ):
     if page < 1:
         page = 1
+
     if limit < 1:
         limit = 100
+
     if limit > 500:
         limit = 500
 
@@ -152,6 +156,20 @@ def procesar_alertas_dataframe(db: Session, df_alertas):
     return alertas_procesadas
 
 
+def ajustar_nivel_por_ciclos(
+    tipo_alerta: str,
+    nivel_alerta: str,
+    ciclos: int
+):
+    if tipo_alerta == "SENAL_CONGELADA":
+        if ciclos >= 10:
+            return "CRITICO"
+
+        return "PREVENTIVO"
+
+    return nivel_alerta
+
+
 def procesar_alerta_individual(
     db: Session,
     identificador: int,
@@ -186,6 +204,14 @@ def procesar_alerta_individual(
         return None
 
     if alerta_activa:
+        alerta_activa.ciclos += 1
+
+        nivel_alerta = ajustar_nivel_por_ciclos(
+            tipo_alerta=tipo_alerta,
+            nivel_alerta=nivel_alerta,
+            ciclos=alerta_activa.ciclos
+        )
+
         alerta_activa.nivel_alerta = nivel_alerta
         alerta_activa.nombre_tag = nombre_tag
         alerta_activa.descripcion = descripcion
@@ -194,12 +220,19 @@ def procesar_alerta_individual(
         alerta_activa.subarea = subarea
         alerta_activa.sistema = sistema
         alerta_activa.fecha_ultima_actualizacion = now
-        alerta_activa.ciclos += 1
 
         db.commit()
         db.refresh(alerta_activa)
 
         return alerta_activa
+
+    ciclos_iniciales = 1
+
+    nivel_alerta = ajustar_nivel_por_ciclos(
+        tipo_alerta=tipo_alerta,
+        nivel_alerta=nivel_alerta,
+        ciclos=ciclos_iniciales
+    )
 
     nueva_alerta = AlertaInstrumento(
         identificador=identificador,
@@ -214,7 +247,7 @@ def procesar_alerta_individual(
         fecha_inicio=now,
         fecha_ultima_actualizacion=now,
         fecha_fin=None,
-        ciclos=1,
+        ciclos=ciclos_iniciales,
         activa=True
     )
 
@@ -224,11 +257,8 @@ def procesar_alerta_individual(
 
     return nueva_alerta
 
-def obtener_estadisticas_dashboard(db):
 
-    # ---------------------------------
-    # Sensores monitoreados
-    # ---------------------------------
+def obtener_estadisticas_dashboard(db):
 
     df_instrumentos = datos_matriz_a()
 
@@ -252,10 +282,6 @@ def obtener_estadisticas_dashboard(db):
         (sensores_con_fallas / total_sensores) * 100,
         2
     ) if total_sensores > 0 else 0
-
-    # ---------------------------------
-    # Alertas por nivel
-    # ---------------------------------
 
     alertas_por_nivel = (
         db.query(
@@ -288,10 +314,6 @@ def obtener_estadisticas_dashboard(db):
         elif nivel == "EMERGENCIA":
             emergencias = cantidad
 
-    # ---------------------------------
-    # Sistema con más alertas
-    # ---------------------------------
-
     sistema_mas_alertas = (
         db.query(
             AlertaInstrumento.sistema,
@@ -315,7 +337,7 @@ def obtener_estadisticas_dashboard(db):
             "con_fallas": sensores_con_fallas,
             "porcentaje_con_fallas": porcentaje_con_fallas
         },
-        "alertas": {
+        "cantidad_alertas": {
             "preventivas": preventivas,
             "criticas": criticas,
             "emergencias": emergencias
@@ -324,4 +346,15 @@ def obtener_estadisticas_dashboard(db):
             "sistema": sistema_mas_alertas[0] if sistema_mas_alertas else None,
             "cantidad_alertas": sistema_mas_alertas[1] if sistema_mas_alertas else 0
         }
+    }
+
+
+def obtener_dashboard_alertas(db: Session):
+
+    estadisticas = obtener_estadisticas_dashboard(db)
+    alertas = listar_alertas_activas(db)
+
+    return {
+        "estadisticas": estadisticas,
+        "alertas": alertas
     }
