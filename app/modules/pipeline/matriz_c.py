@@ -4,11 +4,15 @@ import pandas as pd
 
 from .data_loader import tiempo_actual
 from .matriz_a import datos_matriz_a, INSTRUMENTOS_CONTROL_OPERACIONAL
-from .filtros_iniciales import eliminar_instrumentos_control_operacional
-from .historian_builder import (
-    generar_dataframe_datos_historicos,
+from .filtros_iniciales import (
+    eliminar_instrumentos_control_operacional,
+    CONTROLES_EXTERNOS_RELAVES
 )
-from .filtrar_datos import filtrar_datos_historicos
+from .historian_builder import generar_dataframe_datos_historicos
+from .filtrar_datos import (
+    filtrar_datos_historicos,
+    obtener_grupo_area
+)
 from .metricas import metricas_de_matrices
 from .storage import (
     guardar_datos_matriz_c,
@@ -24,6 +28,22 @@ logger = crear_logger("Pipeline")
 VENTANA_MINUTOS_MATRIZ_C = 30
 PERIODO_MUESTREO_SEGUNDOS_MATRIZ_C = 10
 
+
+ORDEN_AREA_SECA = [
+    "Chancado Primario",
+    "Chancado Secundario",
+    "Chancado Terciario",
+    "Chancado Cuaternario",
+    "Acopio Fino",
+]
+
+
+ORDEN_GRUPOS_NO_SECA = [
+    "AREA_HUMEDA",
+    "RELAVES",
+    "SERVICIOS_GENERALES",
+    "CONCENTRADUCTO",
+]
 
 
 def obtener_identificadores_matriz_c():
@@ -49,13 +69,149 @@ def obtener_identificadores_matriz_c():
 
     df_matriz_a = datos_matriz_a()
 
+    df_matriz_a["Area"] = df_matriz_a["Area"].astype(str).str.strip()
+    df_matriz_a["Subarea"] = df_matriz_a["Subarea"].astype(str).str.strip()
+
     df_identificadores_c = df_identificadores_c.merge(
-        df_matriz_a[["Identificador", "Subarea"]],
+        df_matriz_a[["Identificador", "Area", "Subarea"]],
         on="Identificador",
         how="left"
     )
 
+    df_identificadores_c["GrupoArea"] = (
+        df_identificadores_c["Area"]
+        .apply(obtener_grupo_area)
+    )
+
+    df_controles_externos_relaves = pd.DataFrame({
+        "Identificador": CONTROLES_EXTERNOS_RELAVES,
+        "Area": "3700",
+        "Subarea": "Relaves",
+        "GrupoArea": "RELAVES"
+    })
+
+    df_identificadores_c = (
+        pd.concat(
+            [df_identificadores_c, df_controles_externos_relaves],
+            ignore_index=True
+        )
+        .drop_duplicates(
+            subset=["Identificador"],
+            keep="last"
+        )
+    )
+
     return df_identificadores_c
+
+
+def obtener_grupos_proceso_matriz_c(df_identificadores_c):
+    grupos_proceso = []
+
+    df_area_seca = df_identificadores_c[
+        df_identificadores_c["GrupoArea"] == "AREA_SECA"
+    ]
+
+    for subarea in ORDEN_AREA_SECA:
+        df_subarea = df_area_seca[
+            df_area_seca["Subarea"] == subarea
+        ]
+
+        if df_subarea.empty:
+            continue
+
+        area = str(df_subarea["Area"].iloc[0]).strip()
+
+        grupos_proceso.append({
+            "nombre": subarea,
+            "grupo_area": "AREA_SECA",
+            "area": area,
+            "subarea": subarea,
+            "df": df_subarea
+        })
+
+    for grupo_area in ORDEN_GRUPOS_NO_SECA:
+        df_grupo = df_identificadores_c[
+            df_identificadores_c["GrupoArea"] == grupo_area
+        ]
+
+        if df_grupo.empty:
+            continue
+
+        area = str(df_grupo["Area"].iloc[0]).strip()
+
+        grupos_proceso.append({
+            "nombre": grupo_area,
+            "grupo_area": grupo_area,
+            "area": area,
+            "subarea": grupo_area,
+            "df": df_grupo
+        })
+
+    return grupos_proceso
+
+
+async def procesar_grupo_matriz_c(
+    grupo_proceso,
+    fecha_inicio,
+    fecha_fin
+):
+    nombre = grupo_proceso["nombre"]
+    grupo_area = grupo_proceso["grupo_area"]
+    area = grupo_proceso["area"]
+    subarea = grupo_proceso["subarea"]
+    df_grupo = grupo_proceso["df"]
+
+    if grupo_area == "AREA_SECA":
+        logger.info(
+            f"Construyendo Matriz C para área {area}, "
+            f"subárea: {subarea}"
+        )
+    else:
+        areas = (
+            df_grupo["Area"]
+            .astype(str)
+            .str.strip()
+            .drop_duplicates()
+            .tolist()
+        )
+
+        logger.info(
+            f"Construyendo Matriz C para grupo {grupo_area} | "
+            f"áreas: {areas} | instrumentos: {len(df_grupo)}"
+        )
+
+    df_matriz_c_grupo = await generar_dataframe_datos_historicos(
+        df_matriz=df_grupo[["Identificador"]],
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        minutos_muestreo=0,
+        segundos_muestreo=PERIODO_MUESTREO_SEGUNDOS_MATRIZ_C
+    )
+
+    if df_matriz_c_grupo.empty:
+        return pd.DataFrame()
+
+    df_matriz_c_grupo = filtrar_datos_historicos(
+        df_datos_historicos=df_matriz_c_grupo,
+        subarea=subarea,
+        area=area,
+        grupo_area=grupo_area
+    )
+
+    if df_matriz_c_grupo.empty:
+        return pd.DataFrame()
+
+    columnas_tiempo = obtener_columnas_tiempo(df_matriz_c_grupo)
+
+    if columnas_tiempo:
+        df_matriz_c_grupo = df_matriz_c_grupo[
+            ~df_matriz_c_grupo[columnas_tiempo]
+            .isna()
+            .all(axis=1)
+        ]
+
+    return df_matriz_c_grupo
+
 
 async def matriz_c_builder():
     df_identificadores_c = obtener_identificadores_matriz_c()
@@ -70,46 +226,23 @@ async def matriz_c_builder():
 
     matrices_c = []
 
-    for subarea, df_subarea in df_identificadores_c.groupby("Subarea"):
-        if pd.isna(subarea):
-            continue
+    grupos_proceso = obtener_grupos_proceso_matriz_c(
+        df_identificadores_c
+    )
 
-        logger.info(f"Construyendo matriz C para subárea: {subarea}")
-
-        df_matriz_c_subarea = await generar_dataframe_datos_historicos(
-            df_matriz=df_subarea[["Identificador"]],
+    for grupo_proceso in grupos_proceso:
+        df_matriz_c_grupo = await procesar_grupo_matriz_c(
+            grupo_proceso=grupo_proceso,
             fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin,
-            minutos_muestreo=0,
-            segundos_muestreo=PERIODO_MUESTREO_SEGUNDOS_MATRIZ_C
+            fecha_fin=fecha_fin
         )
 
-        if df_matriz_c_subarea.empty:
-            continue
-
-        df_matriz_c_subarea = filtrar_datos_historicos(
-            df_matriz_c_subarea,
-            subarea
-        )
-
-        if df_matriz_c_subarea.empty:
-            continue
-
-        columnas_tiempo = obtener_columnas_tiempo(df_matriz_c_subarea)
-
-        if columnas_tiempo:
-            df_matriz_c_subarea = df_matriz_c_subarea[
-                ~df_matriz_c_subarea[columnas_tiempo]
-                .isna()
-                .all(axis=1)
-            ]
-
-        if not df_matriz_c_subarea.empty:
-            matrices_c.append(df_matriz_c_subarea)
+        if not df_matriz_c_grupo.empty:
+            matrices_c.append(df_matriz_c_grupo)
 
     if not matrices_c:
         logger.warning(
-            "No se construyó matriz C: no hay instrumentos con datos"
+            "No se construyó Matriz C: no hay instrumentos con datos"
         )
         return "No se construyó Matriz C: no hay instrumentos con datos"
 
@@ -126,8 +259,10 @@ async def matriz_c_builder():
 
     return "Historial de Matriz C construido y guardado en CSV"
 
+
 def obtener_columnas_tiempo(df):
     return df.columns.drop("Identificador", errors="ignore").tolist()
+
 
 def obtener_columnas_tiempo_ordenadas(df):
     columnas_tiempo = obtener_columnas_tiempo(df)
@@ -154,6 +289,7 @@ def obtener_columnas_tiempo_ordenadas(df):
 
     return df_columnas["columna"].tolist()
 
+
 def obtener_ultimo_timestamp_matriz_c(df_datos_matriz_c):
     columnas_tiempo = obtener_columnas_tiempo(df_datos_matriz_c)
 
@@ -170,6 +306,7 @@ def obtener_ultimo_timestamp_matriz_c(df_datos_matriz_c):
         return None
 
     return fechas.max()
+
 
 def mantener_ventana_matriz_c(df_datos_matriz_c, fecha_fin):
     columnas_tiempo = obtener_columnas_tiempo(df_datos_matriz_c)
@@ -205,11 +342,14 @@ def mantener_ventana_matriz_c(df_datos_matriz_c, fecha_fin):
         ["Identificador"] + columnas_validas
     ]
 
+
 async def actualizar_datos_matriz_c():
     df_datos_matriz_c = leer_datos_matriz_c()
 
     if df_datos_matriz_c.empty:
-        logger.warning("No existe data_matriz_c.csv. Construyendo Matriz C completa")
+        logger.warning(
+            "No existe data_matriz_c.csv. Construyendo Matriz C completa"
+        )
         await matriz_c_builder()
         return leer_datos_matriz_c()
 
@@ -240,44 +380,19 @@ async def actualizar_datos_matriz_c():
 
     matrices_nuevas = []
 
-    for subarea, df_subarea in df_identificadores_c.groupby("Subarea"):
-        if pd.isna(subarea):
-            continue
+    grupos_proceso = obtener_grupos_proceso_matriz_c(
+        df_identificadores_c
+    )
 
-        logger.info(f"Actualizando Matriz C para subárea: {subarea}")
-
-        df_nuevos_datos_subarea = await generar_dataframe_datos_historicos(
-            df_matriz=df_subarea[["Identificador"]],
+    for grupo_proceso in grupos_proceso:
+        df_nuevos_datos_grupo = await procesar_grupo_matriz_c(
+            grupo_proceso=grupo_proceso,
             fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin,
-            minutos_muestreo=0,
-            segundos_muestreo=PERIODO_MUESTREO_SEGUNDOS_MATRIZ_C
+            fecha_fin=fecha_fin
         )
 
-        if df_nuevos_datos_subarea.empty:
-            continue
-
-        df_nuevos_datos_subarea = filtrar_datos_historicos(
-            df_nuevos_datos_subarea,
-            subarea
-        )
-
-        if df_nuevos_datos_subarea.empty:
-            continue
-
-        columnas_tiempo = obtener_columnas_tiempo(
-            df_nuevos_datos_subarea
-        )
-
-        if columnas_tiempo:
-            df_nuevos_datos_subarea = df_nuevos_datos_subarea[
-                ~df_nuevos_datos_subarea[columnas_tiempo]
-                .isna()
-                .all(axis=1)
-            ]
-
-        if not df_nuevos_datos_subarea.empty:
-            matrices_nuevas.append(df_nuevos_datos_subarea)
+        if not df_nuevos_datos_grupo.empty:
+            matrices_nuevas.append(df_nuevos_datos_grupo)
 
     if not matrices_nuevas:
         logger.warning("No se obtuvieron nuevos datos para Matriz C")
@@ -319,6 +434,7 @@ async def actualizar_datos_matriz_c():
     )
 
     return df_datos_matriz_c_actualizada
+
 
 async def obtener_metricas_matriz_c():
     df_datos_matriz_c = leer_datos_matriz_c()

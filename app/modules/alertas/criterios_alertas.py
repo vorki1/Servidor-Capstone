@@ -123,6 +123,22 @@ UMBRALES_DELTA_OSCILACION = {
     },
 }
 
+UMBRALES_MEDIA_CONGELADA = {
+    "TEMPERATURA": 0.1,
+    "CORRIENTE": 0.1,
+    "PORCENTAJE": 0.1,
+    "PRESION": 0.05,
+    "VELOCIDAD": 0.01,
+    "RPM": 1,
+    "MM/S": 0.001,
+    "TONELAJE": 1,
+    "POTENCIA": 1,
+    "M^3/H": 1,
+    "MM": 0.1,
+    "M": 0.01,
+    "N/MM": 0.01,
+    "DEFAULT": 0.01,
+}
 def obtener_umbral_delta(unidad_normalizada, tipo_alerta, nivel):
     if tipo_alerta == "CAMBIO_BRUSCO":
         umbrales = UMBRALES_DELTA_CAMBIO_BRUSCO
@@ -169,19 +185,30 @@ def normalizar_unidad(unidad):
 def agregar_unidad_ingenieria(df_merge):
     df_matriz_a = datos_matriz_a()
 
+    columnas_info = [
+        "Identificador",
+        "Unidad_de_Ingenieria",
+        "Area"
+    ]
+
+    columnas_disponibles = [
+        col for col in columnas_info
+        if col in df_matriz_a.columns
+    ]
+
     if "Unidad_de_Ingenieria" not in df_matriz_a.columns:
         logger.warning("Matriz A no contiene Unidad_de_Ingenieria")
         df_merge["Unidad_de_Ingenieria"] = None
         df_merge["Unidad_Normalizada"] = "SIN_UNIDAD"
         return df_merge
 
-    df_unidades = (
-        df_matriz_a[["Identificador", "Unidad_de_Ingenieria"]]
+    df_info = (
+        df_matriz_a[columnas_disponibles]
         .drop_duplicates(subset=["Identificador"])
     )
 
     df_merge = df_merge.merge(
-        df_unidades,
+        df_info,
         on="Identificador",
         how="left"
     )
@@ -193,6 +220,36 @@ def agregar_unidad_ingenieria(df_merge):
 
     return df_merge
 
+def aplicar_restricciones_servicios_generales(df):
+    if "Area" not in df.columns:
+        logger.warning(
+            "No existe Area para aplicar restricciones de Servicios Generales"
+        )
+        return df
+
+    mascara_servicios_generales = (
+        df["Area"]
+        .astype(str)
+        .str.strip()
+        .eq("3100")
+    )
+
+    df.loc[
+        mascara_servicios_generales,
+        "Alerta_Cambio_Brusco"
+    ] = "NORMAL"
+
+    df.loc[
+        mascara_servicios_generales,
+        "Alerta_Oscilacion"
+    ] = "NORMAL"
+
+    df.loc[
+        mascara_servicios_generales,
+        "Alerta_Senal_Recuperada"
+    ] = "NORMAL"
+
+    return df
 
 def guardar_reporte_unidades(df_merge):
     if "Unidad_de_Ingenieria" not in df_merge.columns:
@@ -270,6 +327,12 @@ def guardar_candidatos_alertas(df_merge):
         "Delta_Oscilacion",
         "Ratio_Oscilacion",
         "Alerta_Oscilacion",
+
+        "Media_b",
+        "Media_c",
+        "Delta_Media",
+        "Tolerancia_Media_Congelada",
+        "Alerta_Media_Congelada",
     ]
 
     columnas_existentes = [
@@ -302,10 +365,24 @@ def detectar_todos_cero(df):
     return df
 
 
+def obtener_tolerancia_media(unidad_normalizada):
+    return UMBRALES_MEDIA_CONGELADA.get(
+        unidad_normalizada,
+        UMBRALES_MEDIA_CONGELADA["DEFAULT"]
+    )
 def detectar_media_congelada(df):
     df["Alerta_Media_Congelada"] = "NORMAL"
 
-    tolerancia_media = 0.01
+    if "Unidad_Normalizada" not in df.columns:
+        df["Unidad_Normalizada"] = "SIN_UNIDAD"
+
+    df["Tolerancia_Media_Congelada"] = df["Unidad_Normalizada"].apply(
+        obtener_tolerancia_media
+    )
+
+    df["Delta_Media"] = (
+        df["Media_b"] - df["Media_c"]
+    ).abs().round(6)
 
     condicion = (
         (df["Media_b"].notna())
@@ -318,13 +395,12 @@ def detectar_media_congelada(df):
         & (df["Gradiente_Max_c"] == 0)
         & (df["Gradiente_Intensidad_b"] == 0)
         & (df["Gradiente_Intensidad_c"] == 0)
-        & (abs(df["Media_b"] - df["Media_c"]) <= tolerancia_media)
+        & (df["Delta_Media"] <= df["Tolerancia_Media_Congelada"])
     )
 
-    df.loc[condicion, "Alerta_Media_Congelada"] = "CRITICO"
+    df.loc[condicion, "Alerta_Media_Congelada"] = "PREVENTIVO"
 
     return df
-
 
 def detectar_cambio_brusco(df):
     epsilon = 1e-6
@@ -532,7 +608,7 @@ def tabla_alertas(df_matriz_b, df_matriz_c):
     df_merge = detectar_todos_cero(df_merge)
     df_merge = detectar_media_congelada(df_merge)
     df_merge = detectar_senal_recuperada(df_merge)
-
+    df_merge = aplicar_restricciones_servicios_generales(df_merge)
     guardar_reporte_unidades(df_merge)
     guardar_candidatos_alertas(df_merge)
 

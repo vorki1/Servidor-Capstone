@@ -15,7 +15,6 @@ logger = crear_logger("Loop")
 
 ESPERA_ACTUALIZAR_ALERTAS = 600
 
-
 async def loop_pipeline():
 
     while True:

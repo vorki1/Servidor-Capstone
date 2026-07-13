@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import math
-
+import pandas as pd
+import numpy as np
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,10 @@ from app.modules.alertas.alerta_model import AlertaInstrumento
 from app.modules.alertas import alerta_repository as repo
 from .alerta_constants import TIPOS_ALERTA
 
+from app.core.logger import crear_logger
+
+
+logger = crear_logger("Alertas")
 
 def listar_alertas_activas(db: Session):
     alertas = repo.obtener_activas(db)
@@ -169,7 +174,17 @@ def ajustar_nivel_por_ciclos(
 
     return nivel_alerta
 
+def limpiar_valor_db(valor):
+    if pd.isna(valor):
+        return None
 
+    if isinstance(valor, float) and np.isnan(valor):
+        return None
+
+    if str(valor).strip().lower() in ["nan", "<na>", "none"]:
+        return None
+
+    return valor
 def procesar_alerta_individual(
     db: Session,
     identificador: int,
@@ -183,7 +198,13 @@ def procesar_alerta_individual(
     sistema: str | None = None,
 ):
     now = datetime.now(timezone.utc)
-
+    nombre_tag = limpiar_valor_db(nombre_tag)
+    descripcion = limpiar_valor_db(descripcion)
+    unidad_de_ingenieria = limpiar_valor_db(unidad_de_ingenieria)
+    area = limpiar_valor_db(area)
+    subarea = limpiar_valor_db(subarea)
+    sistema = limpiar_valor_db(sistema)
+    
     alerta_activa = repo.obtener_activa_por_identificador_y_tipo(
         db=db,
         identificador=identificador,
@@ -303,6 +324,9 @@ def obtener_estadisticas_dashboard(db):
 
     for nivel, cantidad in alertas_por_nivel:
 
+        if not nivel:
+            continue
+
         nivel = nivel.upper()
 
         if nivel == "PREVENTIVO":
@@ -320,7 +344,9 @@ def obtener_estadisticas_dashboard(db):
             func.count().label("cantidad")
         )
         .filter(
-            AlertaInstrumento.activa == True
+            AlertaInstrumento.activa == True,
+            AlertaInstrumento.sistema.isnot(None),
+            ~AlertaInstrumento.sistema.ilike("%Sin Clasificar%")
         )
         .group_by(
             AlertaInstrumento.sistema
@@ -329,6 +355,10 @@ def obtener_estadisticas_dashboard(db):
             func.count().desc()
         )
         .first()
+    )
+    logger.info(
+        "Dashboard -> Sistema con más alertas después del filtro: %s",
+        sistema_mas_alertas
     )
 
     return {
@@ -343,8 +373,16 @@ def obtener_estadisticas_dashboard(db):
             "emergencias": emergencias
         },
         "sistema_mas_alertas": {
-            "sistema": sistema_mas_alertas[0] if sistema_mas_alertas else None,
-            "cantidad_alertas": sistema_mas_alertas[1] if sistema_mas_alertas else 0
+            "sistema": (
+                sistema_mas_alertas[0]
+                if sistema_mas_alertas
+                else None
+            ),
+            "cantidad_alertas": (
+                sistema_mas_alertas[1]
+                if sistema_mas_alertas
+                else 0
+            )
         }
     }
 

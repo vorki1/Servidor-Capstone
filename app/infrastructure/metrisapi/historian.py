@@ -2,8 +2,11 @@ from app.infrastructure.metrisapi.base import callback_apply, json_response, Met
 from app.infrastructure.metrisapi.datetimehelpers import convert_datetime_to_isoformat
 from dateutil import tz
 from datetime import datetime
-from dateutil.tz import tzwinlocal
-tzwl = tzwinlocal()
+from dateutil import tz
+from datetime import datetime
+import dateutil.parser
+
+tzwl = tz.gettz("America/Santiago")
 import dateutil.parser
 
 def ticks_from(hours=0, minutes=0, seconds=0):
