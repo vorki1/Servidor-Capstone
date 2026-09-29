@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     await inicializar_archivos_pipeline()
-    asyncio.create_task(loop_pipeline())
+    #asyncio.create_task(loop_pipeline())
 
     yield
 

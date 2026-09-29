@@ -120,7 +120,7 @@ class HistorianClient(MetrisClient):
         trend_values_parameters.start = convert_datetime_to_isoformat(trend_values_parameters.start)
         trend_values_parameters.end = convert_datetime_to_isoformat(trend_values_parameters.end)
         params = trend_values_parameters.as_querystring_dictionary()
-
+        
         return self.session.get(uri, headers=self._get_headers(), params=params)
 
 

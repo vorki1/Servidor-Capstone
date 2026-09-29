@@ -346,7 +346,8 @@ def obtener_estadisticas_dashboard(db):
         .filter(
             AlertaInstrumento.activa == True,
             AlertaInstrumento.sistema.isnot(None),
-            ~AlertaInstrumento.sistema.ilike("%Sin Clasificar%")
+            ~AlertaInstrumento.sistema.ilike("%Sin Clasificar%"),
+            ~AlertaInstrumento.subarea.ilike("%Servicios Generales%")
         )
         .group_by(
             AlertaInstrumento.sistema

@@ -127,10 +127,10 @@ def enviar_json_a_aws(nombre_archivo: str, contenido: dict, limite_kb: int = LIM
         )
 
         logger.info(
-            "Esperando 2 segundos antes del siguiente envío AWS"
+            "Esperando 60 segundos antes del siguiente envío AWS"
         )
 
-        time.sleep(2)
+        time.sleep(60)
 
         return True
 

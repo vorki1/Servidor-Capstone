@@ -28,7 +28,7 @@ from app.core.logger import crear_logger
 logger = crear_logger("Pipeline")
 
 
-DIAS_HISTORICO_MATRIZ_B = 4 #15
+DIAS_HISTORICO_MATRIZ_B = 15
 PERIODO_MUESTREO_MATRIZ_B = 1
 MAX_GRUPOS_CONCURRENTES = 2
 

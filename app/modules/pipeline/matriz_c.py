@@ -2,7 +2,7 @@ from datetime import timedelta
 
 import pandas as pd
 
-from .data_loader import tiempo_actual
+from .data_loader import tiempo_actual, imprimir_estadisticas_consultas,limpiar_estadisticas_consultas
 from .matriz_a import datos_matriz_a, INSTRUMENTOS_CONTROL_OPERACIONAL
 from .filtros_iniciales import (
     eliminar_instrumentos_control_operacional,
@@ -25,7 +25,7 @@ from app.core.logger import crear_logger
 logger = crear_logger("Pipeline")
 
 
-VENTANA_MINUTOS_MATRIZ_C = 30
+VENTANA_MINUTOS_MATRIZ_C = 20
 PERIODO_MUESTREO_SEGUNDOS_MATRIZ_C = 10
 
 
@@ -187,6 +187,8 @@ async def procesar_grupo_matriz_c(
         minutos_muestreo=0,
         segundos_muestreo=PERIODO_MUESTREO_SEGUNDOS_MATRIZ_C
     )
+    imprimir_estadisticas_consultas()
+    limpiar_estadisticas_consultas()
 
     if df_matriz_c_grupo.empty:
         return pd.DataFrame()
@@ -358,15 +360,42 @@ async def actualizar_datos_matriz_c():
     )
 
     if ultimo_timestamp is None:
-        logger.warning("Matriz C sin timestamps. Reconstruyendo Matriz C")
+        logger.warning(
+            "Matriz C sin timestamps. Reconstruyendo Matriz C"
+        )
         await matriz_c_builder()
         return leer_datos_matriz_c()
 
+
+    fecha_fin = tiempo_actual()
+
+    ultimo_timestamp_dt = ultimo_timestamp.to_pydatetime()
+
+    desfase = fecha_fin - ultimo_timestamp_dt
+
+
+    # ==========================================================
+    # SI LA MATRIZ C ESTÁ DEMASIADO ATRASADA, NO HACER BACKFILL
+    # ==========================================================
+    if desfase > timedelta(minutes=VENTANA_MINUTOS_MATRIZ_C):
+        logger.warning(
+            f"Matriz C desactualizada por {desfase}. "
+            f"Se reconstruirán únicamente los últimos "
+            f"{VENTANA_MINUTOS_MATRIZ_C} minutos."
+        )
+
+        await matriz_c_builder()
+
+        return leer_datos_matriz_c()
+
+
+    # ==========================================================
+    # ACTUALIZACIÓN INCREMENTAL NORMAL
+    # ==========================================================
     fecha_inicio = (
-        ultimo_timestamp.to_pydatetime()
+        ultimo_timestamp_dt
         + timedelta(seconds=PERIODO_MUESTREO_SEGUNDOS_MATRIZ_C)
     )
-    fecha_fin = tiempo_actual()
 
     if fecha_inicio >= fecha_fin:
         logger.info("Matriz C ya está actualizada")
