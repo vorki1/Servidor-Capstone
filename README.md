@@ -20,8 +20,8 @@ El servidor actúa como el motor central de procesamiento del ecosistema Capston
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Python 3.10+)
 - **Servidor ASGI:** [Uvicorn](https://www.uvicorn.org/)
 - **Validación y Modelado:** [Pydantic v2](https://docs.pydantic.dev/)
-- **Procesamiento Numérico y Estadístico:** NumPy / Pandas *(ajustar según tus librerías utilizadas)*
-- **Bases de Datos & Caché:** PostgreSQL / Redis *(si aplica)*
+- **Procesamiento Numérico y Estadístico:** NumPy / Pandas
+- **Bases de Datos & Caché:** PostgreSQL / Redis
 - **Documentación Interactiva:** OpenAPI (Swagger UI) y ReDoc integrados nativamente
 
 ---
@@ -35,7 +35,3 @@ El servidor actúa como el motor central de procesamiento del ecosistema Capston
 
 ---
 
-
-1. Clonar el repositorio:
-   ```bash
-   git clone [https://github.com/vorki1/servidor-capstone.git](https://github.com/vorki1/servidor-capstone.git)
